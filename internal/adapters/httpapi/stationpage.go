@@ -3,7 +3,6 @@ package httpapi
 import (
 	"cmp"
 	"context"
-	"errors"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -34,13 +33,14 @@ type PageSection struct {
 	Facilities *PageFacilities `json:"facilities,omitempty"`
 }
 
-// PageHeader is the register's record of the station.
+// PageHeader is the register's record of the station, or a stop's own
+// name where the register holds no station of the id.
 type PageHeader struct {
 	Name       string   `json:"name"`
-	StationNo  string   `json:"stationNo" doc:"DB's register number."`
+	StationNo  *string  `json:"stationNo" nullable:"true" doc:"DB's register number; null for a stop the register does not hold, which is paged from its own name, point, departures and facilities."`
 	EVANo      *string  `json:"eva" nullable:"true" doc:"The main EVA number; null when the register gives none."`
 	EVANumbers []string `json:"evaNumbers"`
-	Slug       string   `json:"slug" doc:"The page's slug on viafrei.de."`
+	Slug       *string  `json:"slug" nullable:"true" doc:"The station page's slug on viafrei.de; null for a stop the register does not hold."`
 	Street     *string  `json:"street" nullable:"true"`
 	Zipcode    *string  `json:"zipcode" nullable:"true"`
 	City       *string  `json:"city" nullable:"true"`
@@ -116,13 +116,13 @@ type PageFacilities struct {
 
 // StationPageData is the data of getStationPage.
 type StationPageData struct {
-	PageURL  string        `json:"pageUrl" doc:"The station's page on viafrei.de, in the language asked."`
+	PageURL  *string       `json:"pageUrl" nullable:"true" doc:"The station's page on viafrei.de, in the language asked. For a stop the register does not hold, its page under the nearest station page that lists it among the stops around it (the bus, tram and U-Bahn stops within 400 m of the station, eight at most, the station's own left out), /<lang>/station/<slug>/stop/<key> with key the stop family's id, colons as hyphens; null when no station page lists it."`
 	Sections []PageSection `json:"sections" doc:"header, rail_ampel, step_free_now, lifts, platforms, departures, service_alerts, parking_charging, in this order, each present."`
 }
 
 // StationPageEnvelope is the enveloped answer of getStationPage.
 type StationPageEnvelope struct {
-	Data  *StationPageData `json:"data" doc:"Null when no station of DB's register has that id."`
+	Data  *StationPageData `json:"data"`
 	Meta  DataMeta         `json:"meta"`
 	Links Links            `json:"links"`
 }
@@ -145,17 +145,14 @@ const stationPageOrigin = "https://viafrei.de/"
 
 func registerStationPage(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "A station's page"
-	op.Description = "A station's page as the platform's station page shows it, section by section: the register's record, the rail lamp, the step-free platforms now, the lifts, the platforms, the next departures, the service alerts and DB's facility flags. Needs the scope transit."
-	featureResponses(api, &op, "Not used by this operation.")
+	op.Description = "A station's page as the platform's station page shows it, section by section: the register's record, the rail lamp, the step-free platforms now, the lifts, the platforms, the next departures, the service alerts and DB's facility flags. A stop listStations answers that DB's register does not hold is paged from its own name, point, departures, lifts and alerts, with no register number, slug or facility flags. An id that names neither answers 404 not-found. Needs the scope transit."
+	featureResponses(api, &op, "No station with this id (not-found), or the operation is switched off on this instance (feature-disabled).")
 	op.Extensions[counterpartExtension] = "station page"
 	huma.Register(api, op, func(ctx context.Context, in *StationPageInput) (*StationPageOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
 		p, err := s.features.StationPage(ctx, principalFrom(ctx).Key, features.StationPageQuery{StationID: in.StationID, Departures: cmp.Or(in.Departures, transit.PageDepartures)})
-		if errors.Is(err, transit.ErrNotFound) {
-			return &StationPageOutput{CacheControl: noStore, Body: StationPageEnvelope{Meta: s.dataMeta(ctx, nil, s.at(), false, partialDetail), Links: s.selfLink(ctx)}}, nil
-		}
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
@@ -188,14 +185,23 @@ func stationPageData(p features.StationPage, lang string) *StationPageData {
 	if en, ok := landsEn[strOr(land)]; ok && lang == "en" {
 		land = &en
 	}
-	slug := strOr(r.Slug)
-	out := &StationPageData{PageURL: stationPageOrigin + lang + "/station/" + slug}
+	var url, stationNo, slug *string
+	switch {
+	case !p.Stop:
+		sl := strOr(r.Slug)
+		u := stationPageOrigin + lang + "/station/" + sl
+		url, stationNo, slug = &u, &r.StationNo, &sl
+	case p.Link != nil:
+		u := stationPageOrigin + lang + "/station/" + p.Link.Slug + "/stop/" + p.Link.Key
+		url = &u
+	}
+	out := &StationPageData{PageURL: url}
 	for _, id := range features.PageSections {
 		sec := p.Sections[id]
 		ps := PageSection{ID: id, AsOf: utc(sec.At), Sources: nonNil(sec.Sources)}
 		switch id {
 		case "header":
-			ps.Header = &PageHeader{Name: r.Name, StationNo: r.StationNo, EVANo: r.EVANo, EVANumbers: nonNil(r.EVANumbers), Slug: slug, Street: r.Street,
+			ps.Header = &PageHeader{Name: r.Name, StationNo: stationNo, EVANo: r.EVANo, EVANumbers: nonNil(r.EVANumbers), Slug: slug, Street: r.Street,
 				Zipcode: r.Zipcode, City: r.City, Land: land, Category: r.Category}
 		case "rail_ampel":
 			lines := make([]PageRailLine, len(p.Ampel.Lines))

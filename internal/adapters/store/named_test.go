@@ -219,6 +219,21 @@ func TestDeparturesOfTripsKeepTheRelation(t *testing.T) {
 	}
 }
 
+// TestDeparturesOfWindowReplaceOnce: the stop times' join and the real-time
+// call's freshness check are each found once in the departure relation and
+// replaced, by the join in the window's times of day and the fresh sources
+// read once.
+func TestDeparturesOfWindowReplaceOnce(t *testing.T) {
+	w := departuresOfWindow("$2::timestamptz", "$3::timestamptz")
+	if strings.Count(departuresOfTrips, stopTimesOfStop) != 1 || strings.Count(departuresOfTrips, siriFresh) != 1 ||
+		strings.Contains(w, siriFresh) ||
+		!strings.Contains(w, "CROSS JOIN ("+timesOfDay("$2::timestamptz", "$3::timestamptz")+") tod\n     "+stopTimesOfStop+
+			" AND "+stopTimeOfDay+" >= tod.lo AND "+stopTimeOfDay+" < tod.hi\n") ||
+		!strings.Contains(w, "(c.source_feed = ANY (ARRAY( SELECT k_1.feed_key") {
+		t.Fatal("the departure relation's stop times join or real-time freshness check is not replaced once")
+	}
+}
+
 // TestTrafficEventsOfFamiliesMatchRulesOnce: the per-event rule match is
 // found in the traffic event relation and replaced.
 func TestTrafficEventsOfFamiliesMatchRulesOnce(t *testing.T) {
@@ -245,12 +260,14 @@ func TestTrafficEventsOfFamiliesReadTheStoredLand(t *testing.T) {
 	}
 }
 
-// TestStationDisruptionOfHourReadsOneRange: the per-ref probe and its limit
-// are found in the station disruption relation and replaced.
+// TestStationDisruptionOfHourReadsOneRange: the per-ref probe and its limit,
+// the stations' read through the index view and the per-call source test are
+// found in the station disruption relation and replaced.
 func TestStationDisruptionOfHourReadsOneRange(t *testing.T) {
 	if strings.Count(relStationDisruption, callsPerRef) != 1 || strings.Contains(stationDisruptionOfHour, callsPerRef) ||
 		strings.Contains(stationDisruptionOfHour, "LIMIT 500") || !strings.Contains(stationDisruptionOfHour, "ON c_1.stop_ref = r.ref") ||
-		strings.Count(relStationDisruption, freshPerCall) != 1 || strings.Contains(stationDisruptionOfHour, freshPerCall) ||
+		strings.Count(relStationDisruption, stationsOfIndex) != 1 || strings.Contains(stationDisruptionOfHour, stationsOfIndex) ||
+		!strings.Contains(stationDisruptionOfHour, stationsWithSlug) || strings.Count(relStationDisruption, freshPerCall) != 1 || strings.Contains(stationDisruptionOfHour, freshPerCall) ||
 		strings.Count(relStationDisruption, rulesPerRow("c.source_feed")) != 1 || strings.Contains(stationDisruptionOfHour, rulesPerRow("c.source_feed")) {
 		t.Fatal("the station disruption relation's read of the calls changed")
 	}

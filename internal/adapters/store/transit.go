@@ -553,7 +553,7 @@ select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mod
                   order by lc.stop_sequence desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
        d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
-from (`+departuresOfTrips+`) d
+from (`+departuresOfWindow("$2::timestamp with time zone", "$3::timestamp with time zone")+`) d
 where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from unnest((select f.ids from fam f)) x))
   and d.board_stop = any(array(select substr(x, strpos(x, ':') + 1) from unnest((select f.ids from fam f)) x))
   and d.stop_point_id = any((select f.ids from fam f)::text[])
@@ -577,6 +577,34 @@ order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp
 // ran past 60 s.
 var departuresOfTrips = "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign, s.gtfs_feed_key AS board_stop_feed, s.id AS board_stop," +
 	strings.TrimPrefix(relDeparture, "\n SELECT")
+
+// stopTimesOfStop is the departure relation's join of a stop's stop
+// times, siriFresh its check, for each real-time call it weighs, that the
+// call's feed is fresh, and stopTimeOfDay a stop time's time of day (the
+// key of stop_times_stop_tod).
+const (
+	stopTimesOfStop = `JOIN stop_times st ON st.gtfs_feed_key = s.gtfs_feed_key AND st.stop_id = s.id AND st.deleted_at IS NULL`
+	siriFresh       = `(EXISTS ( SELECT 1
+                   FROM feed_checks k_1
+                  WHERE k_1.feed_key = c.source_feed AND k_1.checked_at IS NOT NULL AND (k_1.paused OR k_1.checked_at >= (now() - 3::double precision * make_interval(secs => COALESCE(NULLIF(k_1.cadence_s, 0), 600)::double precision)))))`
+	stopTimeOfDay = `mod(date_part('epoch', st.departure)::bigint, 86400::bigint)`
+)
+
+// departuresOfWindow is departuresOfTrips for the calls planned in [from,
+// to), the same rows: a stop's stop times are read in the window's times
+// of day (timesOfDay, on stop_times_stop_tod), which hold every call
+// planned in the window, not each stop time of the stop for its planned
+// instant to be weighed after; and the fresh feeds are read once for the
+// statement, not once for each real-time call weighed.
+func departuresOfWindow(from, to string) string {
+	return strings.NewReplacer(
+		stopTimesOfStop, `CROSS JOIN (`+timesOfDay(from, to)+`) tod
+     `+stopTimesOfStop+` AND `+stopTimeOfDay+` >= tod.lo AND `+stopTimeOfDay+` < tod.hi`,
+		siriFresh, `(c.source_feed = ANY (ARRAY( SELECT k_1.feed_key
+                   FROM feed_checks k_1
+                  WHERE k_1.checked_at IS NOT NULL AND (k_1.paused OR k_1.checked_at >= (now() - 3::double precision * make_interval(secs => COALESCE(NULLIF(k_1.cadence_s, 0), 600)::double precision))))))`,
+	).Replace(departuresOfTrips)
+}
 
 // Departures reads the departing calls of q's station in q's window
 // (features.Transit); the board's rules are transit.Board's.
@@ -736,19 +764,37 @@ select station_ifopt, sum(c)::int, sum(l)::int, array_agg(distinct src order by 
 from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
 
 // stationDisruptionOfHour is the platform's station disruption relation
-// with the calls of the hour read in one range of the aimed departures,
-// joined to the stations' refs, not probed ref by ref (12 580 probes on
-// prod, most of a second; the hour's calls are one range of about 300 000
-// rows); the recently checked feeds and the source rules (per family of
-// $1) are read once, not per call or per group. The relation's limit of 500 calls per ref changes nothing: the
-// most a ref holds in an hour on prod is under a hundred. The calls are
-// those of the families ($1): a statement reading it keeps only those.
+// with the calls of the hour joined to the stations' refs, so the planner
+// picks how to read them: on prod it probes the refs' index per ref, about
+// seven times faster than one range read of the hour's 700 000 calls hashed
+// to the refs. The recently checked feeds and the source rules (per family
+// of $1) are read once, not per call or per group, and the stations are the
+// open register rows with an ifopt and a slug, tested for the slug, not
+// sorted for the current one (the view's lateral, 90 to 380 ms on prod; the
+// semi join 12 ms). The relation's limit of 500 calls per ref changes
+// nothing: the most a ref holds in an hour on prod is under a hundred. The
+// calls are those of the families ($1): a statement reading it keeps only
+// those.
 var stationDisruptionOfHour = strings.NewReplacer(
+	stationsOfIndex, stationsWithSlug,
 	callsPerRef, callsOfHour,
 	"\n                 LIMIT 500) c_1\n", ") c_1 ON c_1.stop_ref = r.ref\n",
 	freshPerCall, freshOnce,
 	rulesPerRow("c.source_feed"), rulesOfFamilies("c.source_feed"),
 ).Replace(relStationDisruption)
+
+// stationsOfIndex is the relation's read of the stations' ifopts through
+// the station index view, whose lateral picks each station's current slug;
+// stationsWithSlug keeps the same stations (the view's open register rows
+// with a slug) without picking it.
+const (
+	stationsOfIndex = `SELECT DISTINCT s.ifopt
+           FROM station_index_live s
+          WHERE s.ifopt IS NOT NULL`
+	stationsWithSlug = `SELECT DISTINCT s.ifopt
+           FROM db_stations s
+          WHERE s.ifopt IS NOT NULL AND s.closed_at IS NULL AND (EXISTS ( SELECT 1 FROM station_slugs g WHERE g.station_no = s.station_no))`
+)
 
 // freshPerCall is the relation's test of a call's feed against the recently
 // checked ones, a scan of them per call; freshOnce reads them once.
@@ -949,7 +995,10 @@ order by m.ord, n.metres`, "float8", "float8", "float8", "text[]", "int", "text[
 // the listed stop each root belongs to (its index), $3 and $4 the window,
 // $5 the families. Each call is its stop's (the first listed whose
 // station family holds its stop point); a trip must call somewhere outside
-// that stop after it.
+// that stop after it. The family's stop points (fam.ids) and each one's
+// first listed stop (fam.ords) are read once, and a later call's stop is
+// looked up among the listed stops' stop points in one hashed set of
+// (stop, stop point), not by a scan of the family for each call.
 //
 //nolint:misspell // materialized is the SQL keyword
 var stopBoardsCalls = named("api_stop_boards_calls", `
@@ -957,7 +1006,9 @@ with grp as materialized (
   select g.ord, m.id member
   from unnest((select $1::text[]), (select $2::int[])) g(root, ord)
   cross join lateral (`+stationFamily("g.root")+`) m(id)),
-fam as materialized (select array(select distinct g.member from grp g) ids)
+fam as materialized (
+  select array_agg(x.member order by x.member) ids, array_agg(x.ord order by x.member) ords
+  from (select g.member, min(g.ord) ord from grp g group by g.member) x)
 select k.ord, d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(d.board_headsign), ''),
        coalesce(nullif(btrim(d.board_headsign), ''),
@@ -968,8 +1019,8 @@ select k.ord, d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transp
                   order by lc.stop_sequence desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
        d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
-from (`+departuresOfTrips+`) d
-cross join lateral (select min(g.ord) ord from grp g where g.member = d.stop_point_id) k
+from (`+departuresOfWindow("(select $3::timestamptz)", "(select $4::timestamptz)")+`) d
+cross join lateral (select f.ords[array_position(f.ids, d.stop_point_id)] ord from fam f) k
 where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from unnest((select f.ids from fam f)) x))
   and d.board_stop = any(array(select substr(x, strpos(x, ':') + 1) from unnest((select f.ids from fam f)) x))
   and d.stop_point_id = any((select f.ids from fam f)::text[])
@@ -982,7 +1033,7 @@ where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from 
                 join stops np on np.gtfs_feed_key = nx.gtfs_feed_key and np.id = nx.stop_id
                where nx.gtfs_feed_key = d.board_feed and nx.trip_id = d.board_trip and nx.stop_sequence > d.call_order
                  and nx.deleted_at is null and np.deleted_at is null and coalesce(np.location_type::integer, 0) = 0
-                 and (np.gtfs_feed_key || ':') || np.id not in (select g.member from grp g where g.ord = k.ord))
+                 and (k.ord, (np.gtfs_feed_key || ':') || np.id) not in (select g.ord, g.member from grp g))
 order by d.planned_departure_at, d.journey_id, d.call_order`, "text[]", "int[]", "timestamptz", "timestamptz", "text[]")
 
 // StopBoards reads the stops around q.At with their departures
@@ -1107,6 +1158,88 @@ func (s *Store) StationRecord(ctx context.Context, id string, families []string)
 			v.At = &geo.Point{Lat: *lat, Lon: *lon}
 		}
 		return v, err
+	})
+}
+
+// stopStations are the register's stations with a page whose stops around
+// them may list the stop $1 (a stop place id, "<feed>:<stop id>"): every
+// open station with a slug within $2 metres of the stop's family, nearest
+// first, each with its own DHIDs (the zHV stops within $5 metres of a StaDa
+// point of its EVA numbers, and a timetable station's own DHID: the page's
+// own stops, never listed around it) and, for each mode of $3 in order, the
+// $4 nearest families serving it within $2 metres of its point. It is the
+// platform's read of the stops around a station page (STOPS_NEAR_SQL at the
+// station's point, with the board's DHID pairing), asked of each station
+// near the stop.
+//
+//nolint:misspell // materialized is the SQL keyword
+var stopStations = named("api_stop_stations", `
+with fam as materialized (
+  select t.geom
+  from stops x
+  join transit_stop_modes t on t.gtfs_feed_key = x.gtfs_feed_key and t.root_id = coalesce(x.parent_id, x.id)
+  where x.gtfs_feed_key = (select split_part($1::text, ':', 1)::smallint) and x.id = (select substr($1::text, strpos($1::text, ':') + 1))
+    and x.deleted_at is null),
+near as materialized (
+  select s.station_no, g.slug, s.geom, s.source_id, s.ifopt, coalesce(s.eva_nos, '{}') || coalesce(array[s.eva_no], '{}') evas,
+         row_number() over (order by st_distance(s.geom, f.geom), s.station_no) ord
+  from fam f
+  join db_stations s on s.closed_at is null and s.geom is not null and st_dwithin(s.geom, f.geom, (select $2::float8))
+  join lateral (select g.slug from station_slugs g where g.station_no = s.station_no order by g.assigned_at desc, g.slug limit 1) g on true)
+select n.ord, n.slug,
+       coalesce((select array_agg(distinct z.external_id order by z.external_id)
+                 from gazetteer_places a
+                 join gazetteer_places z on z.source_id = 'delfi_zhv' and z.kind = 'stop' and z.closed_at is null and z.geom is not null
+                  and st_dwithin(z.geom, a.geom, (select $5::float8))
+                 where a.source_id = 'db_stada' and a.kind = 'station' and a.closed_at is null and a.geom is not null
+                   and a.external_id = any(n.evas)), '{}')
+         || case when n.source_id = 'delfi_static' and n.ifopt is not null then array[n.ifopt] else '{}' end,
+       t.root_id, t.name, coalesce(t.modes, '{}'), coalesce(t.stop_ids, '{}'), t.metres, st_y(t.geom::geometry), st_x(t.geom::geometry)
+from near n
+cross join unnest((select $3::text[])) with ordinality m(mode, mord)
+cross join lateral (
+  select t.root_id, t.name, t.modes, t.stop_ids, t.geom, st_distance(t.geom, n.geom) metres
+  from transit_stop_modes t
+  where t.modes @> array[m.mode] and st_dwithin(t.geom, n.geom, (select $2::float8))
+  order by t.geom <-> n.geom
+  limit (select $4::int)) t
+order by n.ord, m.mord, t.metres`, "text", "float8", "text[]", "int", "float8")
+
+// StopStation reads the page of the stop id names under the nearest
+// station page that lists it among the stops around it
+// (features.Transit); nil when none does.
+func (s *Store) StopStation(ctx context.Context, id string) (*transit.StopLink, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (*transit.StopLink, error) {
+		type row struct {
+			ord      int64
+			slug     string
+			own      []string
+			near     transit.StopNear
+			stopIDs  []string
+			lat, lon float64
+		}
+		rows, _ := run(ctx, tx, stopStations, id, float64(transit.StationAroundM), transit.StationAroundModes, transit.StationAroundPerMode,
+			float64(transit.StationDHIDRadiusM))
+		got, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (row, error) {
+			var v row
+			err := r.Scan(&v.ord, &v.slug, &v.own, &v.near.Root, &v.near.Name, &v.near.Modes, &v.stopIDs, &v.near.Metres, &v.lat, &v.lon)
+			v.near.At = geo.Point{Lat: v.lat, Lon: v.lon}
+			return v, err
+		})
+		if err != nil {
+			return nil, err
+		}
+		var stations []transit.StationAround
+		for i, r := range got {
+			if i == 0 || got[i-1].ord != r.ord {
+				stations = append(stations, transit.StationAround{Slug: r.slug, Own: r.own, Stops: map[string][]string{}})
+			}
+			st := &stations[len(stations)-1]
+			st.Near = append(st.Near, r.near)
+			st.Stops[r.near.Root] = r.stopIDs
+		}
+		_, stop, _ := strings.Cut(id, ":")
+		return transit.ListedStop(stations, stop), nil
 	})
 }
 

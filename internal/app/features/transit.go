@@ -34,6 +34,10 @@ type Transit interface {
 	// StationRecord returns DB's register row of the station id names;
 	// transit.ErrNotFound when none.
 	StationRecord(ctx context.Context, id string, families []string) (transit.StationRecord, error)
+	// StopStation returns the page of the stop id names under the nearest
+	// station page that lists it among the stops around it; nil when none
+	// does.
+	StopStation(ctx context.Context, id string) (*transit.StopLink, error)
 	// StationAlerts returns the alerts in force near a station.
 	StationAlerts(ctx context.Context, q transit.StationAlertsQuery, families []string) ([]transit.StationAlertRow, error)
 	TimetableReach(ctx context.Context) (transit.Reach, error)

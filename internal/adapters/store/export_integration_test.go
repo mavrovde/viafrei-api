@@ -202,6 +202,7 @@ var parity = flag.Bool("parity", false, "compare every named statement with the 
 var noPlatformRead = map[string]string{
 	"api_register_probe":         "the API's own probe of the row versions its register cache is read from; it answers no question",
 	"api_charging_feed_register": "the platform holds the charging feed register as code, not as a table it reads",
+	"api_stop_stations":          "the platform's route lists a station page's stops from the page, not the station pages around a stop; its rows are asserted on their own (TestStopStationIsTheStationThatListsIt)",
 }
 
 // NoPlatformRead is why a named statement has no platform statement to

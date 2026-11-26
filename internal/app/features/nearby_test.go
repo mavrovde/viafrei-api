@@ -72,6 +72,10 @@ func (f *nbFake) StationRecord(context.Context, string, []string) (transit.Stati
 	return transit.StationRecord{}, nil
 }
 
+func (f *nbFake) StopStation(context.Context, string) (*transit.StopLink, error) {
+	return nil, nil
+}
+
 func (f *nbFake) StationAlerts(context.Context, transit.StationAlertsQuery, []string) ([]transit.StationAlertRow, error) {
 	return nil, nil
 }

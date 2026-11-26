@@ -252,15 +252,20 @@ func parkingKept(a, col, fams string) string {
 // corridor (CorridorM of one of the road's location-code points, which only
 // the platform's own parking family is matched by, or filed under the road
 // by its source) and is in name order, unnamed last; a position read keeps
-// the radius and is nearest first. Both then go by id.
+// the radius and is nearest first. Both then go by id. The corridor's
+// facilities are read once, each of the road's points looking its
+// neighbours up on the facilities' location index, not each facility
+// testing every point of the road (on prod about 130 points for each of
+// 6 000 facilities, past the request deadline).
 func parkingWhere(q parking.Query) (where, order string) {
 	filters := `($7::text is null or f.kind = $7) and ($8::text[] is null or f.facilities @> $8)`
 	if q.Road == "" {
 		return `$9 = '' and st_dwithin(` + parkingLocation + `::geography, here.g, $5) and ` + filters, `8, f.facility_id`
 	}
-	return `$5 >= 0 and f.tbl = 'p' and (f.road = $9 or exists (
-    select 1 from st_dumppoints($10::text::geometry) d
-    where st_dwithin(` + parkingLocation + `::geography, d.geom::geography, ` + strconv.Itoa(parking.CorridorM) + `))) and ` + filters, `f.name nulls last, f.facility_id`
+	return `$5 >= 0 and f.tbl = 'p' and (f.road = $9 or f.raw_id = any(array(
+    select x.id from st_dumppoints($10::text::geometry) d
+    join parking_facilities x on x.closed_at is null and x.deleted_at is null
+     and st_dwithin(` + strings.Replace(parkingLocation, "f.", "x.", 1) + `::geography, d.geom::geography, ` + strconv.Itoa(parking.CorridorM) + `)))) and ` + filters, `f.name nulls last, f.facility_id`
 }
 
 // shiftParams moves the where's $7..$10 to $8..$10 and $12, the positions

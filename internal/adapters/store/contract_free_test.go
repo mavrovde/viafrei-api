@@ -109,9 +109,9 @@ func contractReaders(t *testing.T, root string) map[string]bool {
 		if err != nil {
 			return err
 		}
-		// A literal naming a contract relation holds the word, in any
+		// A literal naming a contract relation holds the word and its dot, in any
 		// case: a file without it is not parsed.
-		if !bytes.Contains(bytes.ToLower(src), []byte("contract")) {
+		if !bytes.Contains(bytes.ToLower(src), []byte("contract.")) {
 			return nil
 		}
 		file, err := parser.ParseFile(fset, p, src, parser.SkipObjectResolution)

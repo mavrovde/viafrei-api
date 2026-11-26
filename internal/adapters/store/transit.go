@@ -781,10 +781,13 @@ select station_ifopt, sum(c)::int, sum(l)::int, array_agg(distinct src order by 
 from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
 
 // stationDisruptionOfHour is the platform's station disruption relation
-// with the calls of the hour joined to the stations' refs, so the planner
-// picks how to read them: on prod it probes the refs' index per ref, about
-// seven times faster than one range read of the hour's 700 000 calls hashed
-// to the refs. The recently checked feeds and the source rules (per family
+// with the calls of the hour read by one probe of the refs' index per ref,
+// kept a probe by OFFSET 0 so the planner cannot turn it into a join: as a
+// join it estimated a few hundred of the hour's calls where prod holds
+// 800 000, and read them all in one range hashed to the refs (6.0 to 6.6 s
+// on prod, against 1.1 to 1.2 s per ref). The relation's limit of 500
+// calls per ref is left out, which the join never had: the most a ref
+// holds in an hour on prod is under a hundred. The recently checked feeds and the source rules (per family
 // of $1) are read once, not per call or per group, and the stations are the
 // open register rows with an ifopt and a slug, tested for the slug, not
 // sorted for the current one (the view's lateral, 90 to 380 ms on prod; the
@@ -795,7 +798,7 @@ from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
 var stationDisruptionOfHour = strings.NewReplacer(
 	stationsOfIndex, stationsWithSlug,
 	callsPerRef, callsOfHour,
-	"\n                 LIMIT 500) c_1\n", ") c_1 ON c_1.stop_ref = r.ref\n",
+	"\n                 LIMIT 500) c_1\n", "\n                 OFFSET 0) c_1\n",
 	freshPerCall, freshOnce,
 	rulesPerRow("c.source_feed"), rulesOfFamilies("c.source_feed"),
 ).Replace(relStationDisruption)
@@ -834,10 +837,10 @@ const callsPerRef = `FROM refs r
                    FROM delfi_siri_et_calls_latest x
                   WHERE x.stop_ref = r.ref AND `
 
-// callsOfHour reads the same calls in one range, joined to the refs; the
-// relation's own conditions follow it unchanged.
+// callsOfHour reads the same calls, one probe per ref, of the families
+// ($1) only; the relation's own conditions follow it unchanged.
 const callsOfHour = `FROM refs r
-             JOIN ( SELECT x.stop_ref,
+             CROSS JOIN LATERAL ( SELECT x.stop_ref,
                     x.aimed_dep,
                     x.journey_ref,
                     x.line,
@@ -847,7 +850,7 @@ const callsOfHour = `FROM refs r
                     x.source_feed,
                     x.observed_at
                    FROM delfi_siri_et_calls_latest x
-                  WHERE x.source_feed = any($1::text[]) AND `
+                  WHERE x.stop_ref = r.ref AND x.source_feed = any($1::text[]) AND `
 
 // affectedPlaces are the stations of the families ($1) with these ids or
 // IFOPTs ($2), each with the ref it was named by.

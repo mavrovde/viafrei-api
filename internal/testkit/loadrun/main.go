@@ -86,8 +86,8 @@ var profiles = map[string]profile{
 	},
 	"nightly": {
 		// The soak is 9 minutes, not the hour it was: every job of
-		// load-nightly.yml ends within 15 minutes (owner rule), and the soak
-		// is one job with the stack's start and the warm-up.
+		// load-nightly.yml ends within 15 minutes, the job budget (the owner's cap
+		// is 30), and the soak is one job with the stack's start and the warm-up.
 		rate: 50, warm: 2 * time.Minute, soak: 9 * time.Minute,
 		step: 30 * time.Second, maxRate: 3200,
 		spikeBase: 30 * time.Second, spikeBurst: 10 * time.Second, recover: time.Minute,

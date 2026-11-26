@@ -20,7 +20,7 @@ const releaseShards = 20
 // shardBudget is the most estimated work a release shard may carry, in
 // seconds of a ubuntu-24.04 runner: with the 8 to 23 s of checkout, Go setup
 // and upload that run 45751491495 measured around the units, a shard job
-// stays under 10 minutes, well inside its timeout-minutes: 15.
+// stays under 10 minutes, well inside its timeout-minutes: 30.
 const shardBudget = 540.0
 
 // budgetFindings are the shards over their budget. A shard of one unit

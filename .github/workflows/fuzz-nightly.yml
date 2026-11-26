@@ -5,7 +5,7 @@
 # time held to the 2 s deadline plus 50 ms. Neither reaches anything but the
 # code under test and that CI-started instance (TST-010).
 #
-# Every job ends within 15 minutes (owner rule): each native target runs in
+# Every job ends within 15 minutes (the owner's cap is 30): each native target runs in
 # a job of its own, from the matrix scripts/fuzz.sh --matrix derives from the
 # inventory (so a new target gets its job without an edit here), and a
 # gather job assembles the one report and fails when a target's job failed

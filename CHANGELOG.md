@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.6](https://github.com/mavrovde/viafrei-api/compare/v2.0.5...v2.0.6) (2026-11-27)
+
+
+### Fixed
+
+* **release:** the API no longer reads the MCP server or the npm package viafrei ([#295](https://github.com/mavrovde/viafrei-api/issues/295)) ([33c0652](https://github.com/mavrovde/viafrei-api/commit/33c0652b4ae17add14c7a75371ecdeb6783ab273))
+
 ## [2.0.5](https://github.com/mavrovde/viafrei-api/compare/v2.0.4...v2.0.5) (2026-11-27)
 
 

@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.7](https://github.com/mavrovde/viafrei-api/compare/v2.0.6...v2.0.7) (2026-11-27)
+
+
+### Fixed
+
+* the 100-question round's API faults - watches, punctuality, boards, asOf, Land areas, webcams ([#302](https://github.com/mavrovde/viafrei-api/issues/302)) ([63f90de](https://github.com/mavrovde/viafrei-api/commit/63f90de801521809192052955cb78841561715a8))
+
 ## [2.0.6](https://github.com/mavrovde/viafrei-api/compare/v2.0.5...v2.0.6) (2026-11-27)
 
 

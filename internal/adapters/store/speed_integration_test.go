@@ -160,3 +160,28 @@ func TestTheOfficialCellsAreKeptUnderTheirFamiliesVersions(t *testing.T) {
 		t.Fatal("a cameras read whose official cells cannot be read succeeded")
 	}
 }
+
+// Hamburg's traffic cameras are traffic-view webcams, no enforcement point
+// (#301): a webcam planted beside OpenStreetMap's middle camera is neither
+// listed as an official camera nor cuts that camera, under a key that holds
+// the webcams' family.
+func TestTrafficWebcamsAreNoSpeedCameras(t *testing.T) {
+	st, _ := private(t, append(slices.Clone(speedCutRows),
+		`insert into vf_seed.speed_camera (camera_id, location, name, location_text, source_ref, recorded_at)
+		 values ('hh:990021', st_setsrid(st_makepoint(-19.655, 75.0), 4326), 'A1 AK Testkreuz', 'Jede Kamera kann mehrere Blickrichtungen einnehmen.',
+		         'hh_verkehrskameras', '2026-03-28T00:00:00Z')`)...)
+	fams := append(families(t, st, "roads"), "hh_verkehrskameras")
+	q := roads.SpeedQuery{At: geo.Point{Lat: 75.0, Lon: -19.65}, RadiusM: 30000, Today: time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC), Limit: 10}
+	got, err := st.SpeedCameras(bounded(t), q, fams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range got.Official {
+		if c.Family == "hh_verkehrskameras" {
+			t.Errorf("a webcam listed as an official camera: %+v", c)
+		}
+	}
+	if got.OfficialTotal != 2 || got.OSMTotal != 2 || !slices.ContainsFunc(got.OSM, func(c roads.SpeedCamera) bool { return c.ID == "osm:node990012" }) {
+		t.Errorf("official %d, OSM %+v (total %d)", got.OfficialTotal, got.OSM, got.OSMTotal)
+	}
+}

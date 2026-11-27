@@ -56,6 +56,16 @@ func FuzzParseAddress(f *testing.F) {
 	})
 }
 
+// The Land areas' names are the sixteen Länder's, each its own key.
+func TestLandOfArea(t *testing.T) {
+	if k, ok := places.LandOfArea("baden-wuerttemberg"); !ok || k != "08" {
+		t.Errorf("baden-wuerttemberg: %q %v", k, ok)
+	}
+	if k, ok := places.LandOfArea("Basel"); ok || k != "" {
+		t.Errorf("Basel: %q %v", k, ok)
+	}
+}
+
 func TestTheAbroadJudgementIsThePlatforms(t *testing.T) {
 	req.Covers(t, "ENV-040")
 	for _, c := range []struct {

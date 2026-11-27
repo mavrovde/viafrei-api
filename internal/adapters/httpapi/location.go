@@ -47,8 +47,8 @@ type LocationData struct {
 	Address              *LocationAddress    `json:"address" doc:"The nearest address within 5 km; null when none."`
 	Municipality         *LocationSettlement `json:"municipality" doc:"The nearest municipality within 50 km; null when none."`
 	District             *LocationPlace      `json:"district" doc:"The nearest district within 100 km; null when none."`
-	State                *LocationPlace      `json:"state" doc:"The Land of the district; with no district, the nearest Land within 250 km; null when none."`
-	MayLieOutsideGermany bool                `json:"mayLieOutsideGermany" doc:"True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself."`
+	State                *LocationPlace      `json:"state" doc:"The Land of the district; with no district, the Land whose area is nearest within 250 km, its distance that to the area (0 inside); null when none."`
+	MayLieOutsideGermany bool                `json:"mayLieOutsideGermany" doc:"True when the position may lie outside Germany, off the coast or across the border: no Land area covers it (a point on a border is inside). Where no Land area is held: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself."`
 	Gemeinde             *LocationGemeinde   `json:"gemeinde" doc:"The Gemeinde the position lies in: the one the nearest German address names as its town (inside true), else the nearest Gemeinde within 15 km (inside false); null when none, or when the position may lie outside Germany. It decides the Kreis and the Regierungsbezirk, by its key."`
 	Junction             *LocationJunction   `json:"junction" doc:"The nearest motorway junction within 100 km, as listNearby reads junctions (OpenStreetMap's node on the road the LCL places it on, else the gazetteer's point); null when none."`
 	GovernmentRegion     *string             `json:"governmentRegion" nullable:"true" doc:"The Regierungsbezirk the Gemeinde lies in; null where its Land has none, or with no Gemeinde."`
@@ -108,7 +108,7 @@ func locationPlace(p *places.Place) *LocationPlace {
 
 func registerLocation(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What lies at a position"
-	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places."
+	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the Land whose area is nearest); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places."
 	featureResponses(api, &op, "Not used by this operation.")
 	op.Extensions[counterpartExtension] = "location description"
 	huma.Register(api, op, func(ctx context.Context, in *LocationInput) (*LocationOutput, error) {

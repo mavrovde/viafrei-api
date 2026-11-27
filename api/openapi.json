@@ -3654,7 +3654,7 @@
             ]
           },
           "mayLieOutsideGermany": {
-            "description": "True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself.",
+            "description": "True when the position may lie outside Germany, off the coast or across the border: no Land area covers it (a point on a border is inside). Where no Land area is held: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself.",
             "type": "boolean"
           },
           "municipality": {
@@ -3696,7 +3696,7 @@
           },
           "state": {
             "additionalProperties": false,
-            "description": "The Land of the district; with no district, the nearest Land within 250 km; null when none.",
+            "description": "The Land of the district; with no district, the Land whose area is nearest within 250 km, its distance that to the area (0 inside); null when none.",
             "properties": {
               "code": {
                 "description": "The official region code; null when none.",
@@ -16188,7 +16188,7 @@
     },
     "/v1/location": {
       "get": {
-        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places.",
+        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the Land whose area is nearest); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places.",
         "operationId": "describeLocation",
         "parameters": [
           {

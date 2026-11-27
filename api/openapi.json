@@ -27,13 +27,13 @@
         }
       },
       "RateLimit": {
-        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas. An overloaded refusal carries the policy but no RateLimit field: it was refused under load, not by the key's budget.",
         "schema": {
           "type": "string"
         }
       },
       "RateLimit-Policy": {
-        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas. An overloaded refusal carries the policy but no RateLimit field: it was refused under load, not by the key's budget.",
         "schema": {
           "type": "string"
         }

@@ -340,6 +340,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		limitURI(d.Config.Server.MaxURIBytes),
 		limitAddress(d.Addresses, keyed, service, s.chargeKey),
 		withDeadline(d.Config.Deadline.Request),
+		withoutRemainingOnShed,
 	)
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, newProblem(r.Context(), SlugNotFound, "Nothing exists at this path.", 0))

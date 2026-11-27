@@ -193,7 +193,7 @@ func GateViolations() int64 { return gateViolations.Load() }
 // rateLimitDoc pins the draft revision whose syntax the RateLimit fields
 // follow (RATE-006).
 const rateLimitDoc = "Sent on every keyed answer but a 401, success or error, in the syntax of " + RateLimitDraft +
-	": a burst policy, and a day and a month policy for a plan with those quotas."
+	": a burst policy, and a day and a month policy for a plan with those quotas. An overloaded refusal carries the policy but no RateLimit field: it was refused under load, not by the key's budget."
 
 // keyedResponses documents the refusals every keyed operation may answer
 // besides its own: a 401 carries the WWW-Authenticate challenge (RFC 6750).

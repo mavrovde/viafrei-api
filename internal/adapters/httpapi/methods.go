@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"strings"
@@ -45,3 +46,43 @@ func allowed(router chi.Routes, path string) string {
 	}
 	return strings.Join(out, ", ")
 }
+
+// shedKey holds a request's shedMark.
+type shedKey struct{}
+
+// shedMark is set when the request is refused as overloaded.
+type shedMark struct{ shed bool }
+
+// markShed records on ctx's request that it is refused as overloaded.
+func markShed(ctx context.Context) {
+	if m, ok := ctx.Value(shedKey{}).(*shedMark); ok {
+		m.shed = true
+	}
+}
+
+// withoutRemainingOnShed leaves the RateLimit field out of an overloaded
+// refusal (#156): the admission refused it under load, not the key's
+// budget, so the key's remaining units would tell the client to retry at
+// once. The policy stays; a refusal by the key's own rate or quota keeps
+// both fields.
+func withoutRemainingOnShed(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m := &shedMark{}
+		next.ServeHTTP(&shedWriter{ResponseWriter: w, mark: m}, r.WithContext(context.WithValue(r.Context(), shedKey{}, m)))
+	})
+}
+
+// shedWriter drops the RateLimit field when its request was shed.
+type shedWriter struct {
+	http.ResponseWriter
+	mark *shedMark
+}
+
+func (s *shedWriter) WriteHeader(code int) {
+	if s.mark.shed {
+		s.Header().Del("RateLimit")
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *shedWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }

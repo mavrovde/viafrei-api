@@ -105,7 +105,12 @@ the queue of its plan's tier, `critical`, `standard` or `bulk`:
 - no key holds more than `tiers.per_key_inflight` permits (RATE-016).
 
 `Retry-After` on an `overloaded` refusal is the estimated time for the
-queues to drain, at least one second.
+queues to drain, at least one second. The refusal is told apart from the
+key's own budget by its problem type, `overloaded`, and by its fields: it
+carries the key's `RateLimit-Policy` but no `RateLimit` field, since the
+units the key has left say nothing about the load and would tell a client
+that follows them to retry at once. A refusal by the key's rate or quota
+(`rate-limited`, `quota-exceeded`) carries both.
 
 A read that gets its permit too late to keep `db.statement_timeout_floor`
 before its deadline is refused with `503 deadline-exhausted` without

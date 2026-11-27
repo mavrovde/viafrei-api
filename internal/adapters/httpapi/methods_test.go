@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/ratelimit"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -195,6 +196,45 @@ func TestEveryGetOperationAnswersHeadAndRefusesEmptyValues(t *testing.T) {
 			w := raw(h, http.MethodGet, target+"?"+name+"=", nil)
 			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"query.`+name+`"`) {
 				t.Errorf("GET %s?%s=: %d %s", target, name, w.Code, w.Body)
+			}
+		}
+	}
+}
+
+// An overloaded refusal is told apart from the key's own budget (#156): its
+// problem type is overloaded with Retry-After, at admission.shed_status,
+// and it carries the key's RateLimit-Policy but no RateLimit remaining
+// value; a refusal by the key's quota keeps both fields.
+func TestAnOverloadedRefusalCarriesNoRemainingValue(t *testing.T) {
+	req.Covers(t, "RATE-006")
+	known := principal("consumer")
+	known.Key.Plan.Rate, known.Key.Plan.Burst = 10, 10
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusServiceUnavailable} {
+		cfg := config.Defaults()
+		cfg.RateLimit.Headers = true
+		cfg.Admission.ShedStatus = status
+		for _, tc := range []struct {
+			v         ratelimit.Verdict
+			sources   *fakeSources
+			status    int
+			slug      string
+			remaining bool
+		}{
+			{ratelimit.Verdict{}, &fakeSources{regErr: &admission.Refusal{RetryAfter: time.Second}}, status, "overloaded", false},
+			{ratelimit.Verdict{Refused: ratelimit.QuotaExceeded, RetryAfter: time.Hour}, &fakeSources{register: fixtureRegister}, http.StatusTooManyRequests, "quota-exceeded", true},
+		} {
+			h, err := httpapi.NewHandler(httpapi.Deps{Config: cfg, Build: buildinfo.Info{Version: "t", Commit: "c"},
+				ContractVersion: "0.1", Now: func() time.Time { return fixedNow }, Auth: &fakeAuth{p: known}, Keys: &verdictGate{v: tc.v}, Sources: tc.sources})
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := do(t, h, http.MethodGet, "/v1/key", bearer)
+			assertProblem(t, w, tc.status, tc.slug)
+			if w.Header().Get("Retry-After") == "" || w.Header().Get("RateLimit-Policy") == "" {
+				t.Errorf("%s at %d: %v", tc.slug, status, w.Header())
+			}
+			if got := w.Header().Get("RateLimit") != ""; got != tc.remaining {
+				t.Errorf("%s at %d: RateLimit %q", tc.slug, status, w.Header().Get("RateLimit"))
 			}
 		}
 	}

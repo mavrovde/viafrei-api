@@ -290,6 +290,7 @@ func (s *server) overloadedProblem(ctx context.Context, err error) (*Problem, bo
 		return nil, false
 	}
 	noteRefusal(ctx, metering.Overloaded)
+	markShed(ctx)
 	p := newProblem(ctx, SlugOverloaded, "The service is overloaded; retry after the time given.", limits.Seconds(r.RetryAfter))
 	p.Status = s.cfg.Admission.ShedStatus
 	return p, true

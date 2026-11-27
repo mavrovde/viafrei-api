@@ -303,17 +303,17 @@ jobs:
           GOTOOLCHAIN: local
         run: |
           cp api/openapi.json dist/openapi.json
-          breaking=0
           if [[ -n $PREV ]] && git cat-file -e "$PREV:api/openapi.json" 2>/dev/null; then
             git show "$PREV:api/openapi.json" > /tmp/prev-openapi.json
             go run github.com/oasdiff/oasdiff@v1.34.0 changelog /tmp/prev-openapi.json dist/openapi.json > dist/openapi-changelog.txt
             go run github.com/oasdiff/oasdiff@v1.34.0 breaking /tmp/prev-openapi.json dist/openapi.json > dist/openapi-breaking.txt
-            [[ -s dist/openapi-breaking.txt ]] && breaking=1
+            # The text above is non-empty when it reports no break; the JSON decides (release-api-notes.sh).
+            go run github.com/oasdiff/oasdiff@v1.34.0 breaking --format json /tmp/prev-openapi.json dist/openapi.json > /tmp/openapi-breaking.json
           else
             echo "No previous release holds api/openapi.json: this is the first published contract." > dist/openapi-changelog.txt
             : > dist/openapi-breaking.txt
+            echo '[]' > /tmp/openapi-breaking.json
           fi
-          echo "breaking=$breaking" >> "$GITHUB_OUTPUT"
       - name: SHA256SUMS
         working-directory: dist
         run: sha256sum -- * > SHA256SUMS && cat SHA256SUMS
@@ -325,7 +325,6 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
           PRERELEASE: ${{ steps.tag.outputs.prerelease }}
           PREV: ${{ steps.tag.outputs.previous }}
-          BREAKING: ${{ steps.oas.outputs.breaking }}
           HIGHEST: ${{ steps.tag.outputs.highest }}
           TAGLIST: ${{ steps.tags.outputs.list }}
         run: |
@@ -340,12 +339,7 @@ jobs:
           fi
           {
             echo
-            if [[ $BREAKING == 1 ]]; then
-              echo "## ⚠ Breaking API changes"
-              echo
-              echo "oasdiff reports breaking changes against $PREV; see \`openapi-breaking.txt\`."
-              echo
-            fi
+            bash scripts/release-api-notes.sh /tmp/openapi-breaking.json dist/openapi-changelog.txt "${PREV:-the first release}"
             echo "## Container image"
             echo
             echo "Digest: \`$IMAGE@$DIGEST\`"

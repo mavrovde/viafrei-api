@@ -10,9 +10,11 @@ import (
 
 // poiMatch reads the places of interest whose name or brand holds $1 (both
 // in their search form): in the town $2, or within $5 metres of ($3, $4),
-// or anywhere; in the family $6 when set. The name spelt as asked first,
-// then one that begins with it, then the nearest, then the closest in
-// trigrams and by name, as the platform ranks equal matches; at most
+// or anywhere; in the family $6 when set. Around a position the nearest
+// first (a pharmacy asked near a point is the closest one, whatever its
+// name); else the name spelt as asked first, then one that begins with it,
+// then the closest in trigrams and by name, as the platform ranks equal
+// matches; at most
 // places.PoiReach+1 from the start, so the total says whether more matched;
 // $7 the families.
 // Every parameter is opaque (opaqued), as in every other read, so the plan
@@ -20,18 +22,20 @@ import (
 // plan holds a branch for each way the match is asked (poiCandidates), and
 // only the branch the parameters name runs (a one-time filter on them).
 var poiMatch = namedOpaque("api_poi_match", `select 'osm:' || p.osm_type || p.osm_id poi_id, p.name, p.category, p.category_value, p.brand, p.operator,
-       p.street, p.house_number, p.postcode, p.place, st_y(p.geom::geometry), st_x(p.geom::geometry),
-       case when $3::float8 is null then null
-            else round(st_distance(p.geom, st_setsrid(st_makepoint($3::float8, $4::float8), 4326)::geography))::int end as distance_m,
+       p.street, p.house_number, p.postcode, p.place, st_y(p.geom::geometry), st_x(p.geom::geometry), p.distance_m,
        p.extract_date, p.source_id
-from `+poiCandidates+` p
-where p.closed_at is null and p.geom is not null
-  and ($2::text is null or p.place_norm = $2::text)
-  and ($3::float8 is null or st_dwithin(p.geom, st_setsrid(st_makepoint($3::float8, $4::float8), 4326)::geography, $5::float8))
-  and ($6::text is null or p.category = $6::text)
-  and p.source_id = any((`+ruledFamilies("$7::text[]")+`)::text[])
-order by case when p.name_norm = $1::text then 0 when p.name_norm like $1::text || '%' then 1 else 2 end,
-         distance_m nulls last, similarity(p.name_norm, $1::text) desc, p.name, poi_id
+from (
+  select `+poiColumns+`, case when $3::float8 is null then null
+                   else round(st_distance(p.geom, st_setsrid(st_makepoint($3::float8, $4::float8), 4326)::geography))::int end distance_m
+  from `+poiCandidates+` p
+  where p.closed_at is null and p.geom is not null
+    and ($2::text is null or p.place_norm = $2::text)
+    and ($3::float8 is null or st_dwithin(p.geom, st_setsrid(st_makepoint($3::float8, $4::float8), 4326)::geography, $5::float8))
+    and ($6::text is null or p.category = $6::text)
+    and p.source_id = any((`+ruledFamilies("$7::text[]")+`)::text[])) p
+order by case when $3::float8 is not null then p.distance_m end nulls last,
+         case when p.name_norm = $1::text then 0 when p.name_norm like $1::text || '%' then 1 else 2 end,
+         p.distance_m nulls last, similarity(p.name_norm, $1::text) desc, p.name, poi_id
 limit $8::int`, poiTypes...)
 
 // poiCandidates are the places the match then filters, from the one branch

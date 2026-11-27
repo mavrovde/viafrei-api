@@ -20987,7 +20987,7 @@
     },
     "/v1/pois": {
       "get": {
-        "description": "The places of interest OpenStreetMap maps whose name or brand holds the text: in a town, around a position, or anywhere; the name spelt as asked first, then one that begins with it, then the nearest. Pages of up to 25, at most 50 in all. Needs the scope places.",
+        "description": "The places of interest OpenStreetMap maps whose name or brand holds the text: in a town, around a position, or anywhere; around a position the nearest first, else the name spelt as asked first, then one that begins with it. Pages of up to 25, at most 50 in all. Needs the scope places.",
         "operationId": "listPois",
         "parameters": [
           {

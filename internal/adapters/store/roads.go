@@ -117,6 +117,13 @@ func opaqueNamed(name, sql string, types ...string) stmt {
 // written before it was stored, the platform's rule on the row's point.
 const autobahnLand = `coalesce(e.land_code, contract_junction_land(st_pointonsurface(e.geom::geometry)::geography))`
 
+// autobahnInForce is whether an Autobahn message is in force now, the
+// motorway read's rule for an announced entry turned round: the publisher
+// marks it future, or its description lists validity windows of which none
+// holds now. A closure announced for next week, or one valid only at night,
+// gives the lamp no reason while it is not in force (it is still listed).
+const autobahnInForce = `not (coalesce(a.future, '') = 'true' or coalesce(not autobahn_validity_overlaps(a.lines, now(), now()), false))`
+
 // autobahnStarted is the start an Autobahn message states, when it states
 // one as a time, else when it was seen.
 const autobahnStarted = `coalesce(case when a.starts ~ '^\d{4}-\d\d-\d\dT\d\d:\d\d' then a.starts::timestamptz end, a.observed_at)`
@@ -160,11 +167,11 @@ func trafficEvents(in string) string {
 autobahn as (
   select e.observed_at, e.road, e.kind, e.ext_id, e.title, e.subtitle, e.abnormal_traffic_type, e.delay_s, e.geom, e.source, ` + landA + ` land_code,
          coalesce(e.raw->>'isBlocked', c.blocked) blocked, coalesce(e.raw->>'startTimestamp', c.starts) starts,
-         coalesce(e.raw->'description', c.lines) lines
+         coalesce(e.raw->'description', c.lines) lines, coalesce(e.raw->>'future', c.future) future
   from autobahn_events e
   join newest n on n.road = e.road and n.kind = e.kind and n.at = e.observed_at
   left join lateral (
-    select r.raw->>'isBlocked' blocked, r.raw->>'startTimestamp' starts, r.raw->'description' lines
+    select r.raw->>'isBlocked' blocked, r.raw->>'startTimestamp' starts, r.raw->'description' lines, r.raw->>'future' future
     from autobahn_events r
     where e.raw is null and r.ext_id = e.ext_id and r.raw is not null and r.raw_hash = e.raw_hash
       and r.observed_at <= e.observed_at and r.observed_at >= date_trunc('day', e.observed_at, 'UTC')
@@ -192,7 +199,7 @@ b as (
          a.subtitle, null::text place_text,
          case a.blocked when 'true' then true when 'false' then false end is_blocked,
          a.abnormal_traffic_type traffic_type, case when a.delay_s >= 0 then a.delay_s end delay_s, null::text confidentiality,
-         a.land_code
+         a.land_code, ` + autobahnInForce + ` in_force
   from autobahn a
   union all
   select 'datex:' || e.source_id || ':' || e.publication_id,
@@ -217,7 +224,7 @@ b as (
          coalesce(e.overall_start, e.first_seen_at), e.overall_end,
          null::int, null::int, null::int, null::int, coalesce(e.event_type, 'situation'), null::text, 'de',
          e.source_feed, e.publication_id, e.feed_ts, e.first_seen_at, e.updated_at, e.closed_at, 'traffic_message',
-         null::text, null::text, null::boolean, null::text, null::int, e.confidentiality, ` + landR + `
+         null::text, null::text, null::boolean, null::text, null::int, e.confidentiality, ` + landR + `, true
   from road_events e
   where e.deleted_at is null` + inLandRE + `)
 select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.direction, b.direction_label, b.location,
@@ -227,7 +234,7 @@ select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.directi
        array[b.source_ref] source_refs,
        case when coalesce(b.confidentiality, 'noRestriction') <> 'noRestriction' then 'withhold'
             else coalesce(k.display_class, 'open') end display_class,
-       coalesce(k.audience, 'public') audience, b.confidentiality, k.origin_restriction, ` + state + `
+       coalesce(k.audience, 'public') audience, b.confidentiality, k.origin_restriction, b.in_force, ` + state + `
 from b
 ` + eventRulePerRow + `
 where not coalesce(k.excluded, false))`
@@ -279,7 +286,7 @@ func messagesSelect(in string) string {
 const messagesAgg = `jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
                                          's', e.subtitle, 't', e.description, 'p', e.place_text,
                                          'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
-                                         'ds', e.delay_s, 'd', ` + roadDelayMin + `)) filter (where e.valid_from <= $2)`
+                                         'ds', e.delay_s, 'd', ` + roadDelayMin + `)) filter (where e.valid_from <= $2 and e.in_force)`
 
 // messagesFrom reads the situations of the families $1 that have not ended
 // at $2, with their Land when they may lie in the Land in (trafficEvents).

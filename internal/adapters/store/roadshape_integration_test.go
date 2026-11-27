@@ -232,9 +232,23 @@ func TestMotorwaysCountTheFamiliesOfEveryRoad(t *testing.T) {
 			t.Errorf("%+v: %d roads, families counted %q, want %q", q, len(ms), counted, want)
 		}
 	}
-	// A situation in force on a road the register does not hold, of a
-	// family no register road carries (its other situations are withdrawn),
-	// is counted by neither statement.
+	// No family asked: none is counted, and the roads are still listed.
+	ms, counted, err := st.Motorways(ctx, roads.CatalogueQuery{Limit: 500}, nil, now)
+	if err != nil || len(counted) != 0 || len(ms) == 0 {
+		t.Fatalf("no family: %d roads, %q, %v", len(ms), counted, err)
+	}
+}
+
+// A situation in force on a road the register does not hold, of a family no
+// register road carries (its other situations are withdrawn), is counted by
+// neither the catalogue nor the frozen families statement.
+func TestMotorwaysNeverCountASituationOffTheRegister(t *testing.T) {
+	req.Covers(t, "NFR-PERF-001")
+	ctx := bounded(t)
+	now := time.Now()
+	var fams []string
+	owner(t, `select coalesce(array_agg(distinct source_ref order by source_ref), '{}') from contract.traffic_event`, &fams)
+	var want []string
 	var lone string
 	owner(t, `select source_ref from contract.traffic_event where event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`, &lone)
 	planted, pdb := private(t, `insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, headline, source_ref,
@@ -260,10 +274,5 @@ func TestMotorwaysCountTheFamiliesOfEveryRoad(t *testing.T) {
 	}
 	if _, counted, err := planted.Motorways(ctx, roads.CatalogueQuery{Limit: 500}, off, now); err != nil || slices.Contains(counted, lone) || !slices.Equal(counted, want) {
 		t.Fatalf("off the register: families counted %q, want %q (%v)", counted, want, err)
-	}
-	// No family asked: none is counted, and the roads are still listed.
-	ms, counted, err := st.Motorways(ctx, roads.CatalogueQuery{Limit: 500}, nil, now)
-	if err != nil || len(counted) != 0 || len(ms) == 0 {
-		t.Fatalf("no family: %d roads, %q, %v", len(ms), counted, err)
 	}
 }

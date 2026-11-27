@@ -171,6 +171,16 @@ func TestStopsOfOneNameLeadWithTheEVAThenTheServedThenTheDHID(t *testing.T) {
 			t.Errorf("%s: %v, more %v, %v; want %s and more", text, stationIDs(ss), more, err, want)
 		}
 	}
+	// Ties on distance and name never stretch a page past its limit: the
+	// statement answers the limit it is asked, and the page holds the limit.
+	for limit := 1; limit <= 3; limit++ {
+		q := transit.Query{Text: "Quellhof, Bahnhof (Bus)", Limit: limit}
+		n, err := st.StationRowsOf(bounded(t), q, fams)
+		ss, more, serr := st.Stations(bounded(t), q, fams)
+		if err != nil || serr != nil || n != limit || len(ss) != limit || more != (limit < 3) {
+			t.Errorf("limit %d: statement %d rows (%v), page %v more %v (%v)", limit, n, err, stationIDs(ss), more, serr)
+		}
+	}
 	// The rest of a name keeps the id order.
 	ss, _, err := st.Stations(bounded(t), transit.Query{Text: "Quellhof, Bahnhof (Bus)", Limit: 5}, fams)
 	if got := stationIDs(ss); err != nil || !slices.Equal(got, []string{"1:000099980713", "1:000099980711", "1:000099980712"}) {

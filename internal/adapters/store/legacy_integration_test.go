@@ -340,7 +340,8 @@ limit $5`
 // search only, a search with no text keeping its order. The keys are the
 // statement's own (stationTies, over the view's row): what the replay
 // holds to the frozen order is the page, a sort of every match against the
-// statement's ranked cut of each name at its limit.
+// statement's ranked cut of each name at its limit. Both are cut at
+// exactly the limit, in a total order (id last): ties never lengthen a page.
 var (
 	legacyStationTies = stationTies("s")
 	legacyTextTies    = `case when $4::text = '' then null else array[` + legacyStationTies + `] end`

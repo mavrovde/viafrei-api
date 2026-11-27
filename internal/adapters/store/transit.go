@@ -249,7 +249,11 @@ const (
 // The limit keeps every key that shares its distance and name with one
 // within it (rank, not row_number): keyedPage orders the stops of one name
 // by what only their full rows say (stationTies), so the one a person
-// means reaches the page even where its id sorts it past the limit.
+// means reaches the page even where its id sorts it past the limit. Those
+// keys are this CTE's alone: keyedPage cuts the page at exactly the limit,
+// in a total order (id last). Ordering the keys here by stationTies would
+// read the DB record and the calls of every key the text finds, which is
+// what keyed is there to avoid.
 func keyed(name, sel, limit string) string {
 	return `
 ` + name + ` as (select w.stop_place_id, w.name, w.dist from (

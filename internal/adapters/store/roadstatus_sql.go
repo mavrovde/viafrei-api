@@ -125,6 +125,12 @@ var (
            case m.kind when 'closure' then 0 else 1 end,
            m.distance_m nulls last,
            m.title, m.ext_id`, "text[]", "timestamptz[]", "text[]", "text[]", "int", "float8", "float8", "float8", "timestamptz", "timestamptz", "boolean")
+	// The answer rows' texts are read from each entry's payload (the plan
+	// sources' publications: up to 4.5 MB as text, 37 kB stored): the
+	// payload is decompressed once per entry (dp, kept apart by offset 0;
+	// #> '{}' is the whole value), where each of the eight paths over it
+	// decompressed it again (#290: A3 on prod, six alternating runs, median
+	// 360 -> 210 ms).
 	roadStatusPlanned = named("api_road_status_planned", `
   with m0 as (
     select e.id, e.feed_key, e.road_number, e.event_type, e.publisher,
@@ -220,22 +226,23 @@ var (
          p.total_rows, p.total_planned, p.total_current, p.total_closed, p.total_programme, p.near_rows, p.near_closed, p.feed_keys, p.current_feed_keys,
          (select array_agg(distinct m0.feed_key) from m0 where (((m0.feed_key = 'traffic_berlin' and m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'traffic_lms_berlin')) or (m0.feed_key = 'viz_berlin' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'traffic_berlin') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'traffic_berlin')))) or (m0.feed_key = 'roadworks_mv_planned' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_mv') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_mv')))) or (m0.feed_key = 'ald_14d' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_bast') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_bast')))) or (m0.feed_key = 'roadworks_akd' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_bast') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_bast')))) or (m0.feed_key = 'sperrinfosys_sn' and m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_ald_sn')) or (m0.feed_key = 'roadworks_he_gesammelt' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_he') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'roadworks_he')))) or (m0.feed_key = 'traffic_nrw' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'nms_events') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'nms_events')))) or (m0.feed_key = 'traffic_nrw_einzel' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'nms_events') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'nms_events')))) or (m0.feed_key = 'traffic_hamburg' and (m0.publication_id in (select o2.publication_id from m0 o2 where o2.feed_key = 'nms_events') or (m0.twin_of is not null and m0.twin_of in (select o2.publication_id from m0 o2 where o2.feed_key = 'nms_events'))))))) as also_feed_keys,
          coalesce(
-           jsonb_path_query_first(x.payload, '$.headerInformation.headerInformationExtension.EventName."#text"') #>> '{}',
-           jsonb_path_query_first(x.payload, '$.situationRecord.generalPublicComment ? (@.commentType."#text" == "locationDescriptor").comment.values.value."#text"') #>> '{}',
-           jsonb_path_query_first(x.payload, '$.situationRecord.groupOfLocations.**.roadName.values.value."#text"') #>> '{}'
+           jsonb_path_query_first(dp.p, '$.headerInformation.headerInformationExtension.EventName."#text"') #>> '{}',
+           jsonb_path_query_first(dp.p, '$.situationRecord.generalPublicComment ? (@.commentType."#text" == "locationDescriptor").comment.values.value."#text"') #>> '{}',
+           jsonb_path_query_first(dp.p, '$.situationRecord.groupOfLocations.**.roadName.values.value."#text"') #>> '{}'
          ) as place_text,
-         jsonb_path_query_first(x.payload, '$.situationRecord.generalPublicComment ? (!exists(@.commentType) || @.commentType."#text" == "description").comment.values.value."#text"') #>> '{}' as detail_text,
+         jsonb_path_query_first(dp.p, '$.situationRecord.generalPublicComment ? (!exists(@.commentType) || @.commentType."#text" == "description").comment.values.value."#text"') #>> '{}' as detail_text,
          (select string_agg(v.n, ', ' order by v.o) from (
              select r.j #>> '{}' as n, min(r.o) as o
-               from jsonb_path_query(x.payload, '$.situationRecord[*] ? (@."@xsi:type" == "ReroutingManagement").alternativeRoute.**.roadNumber."#text"') with ordinality as r(j, o)
+               from jsonb_path_query(dp.p, '$.situationRecord[*] ? (@."@xsi:type" == "ReroutingManagement").alternativeRoute.**.roadNumber."#text"') with ordinality as r(j, o)
               group by 1
            ) v) as detour_via,
-         jsonb_path_exists(x.payload, '$.situationRecord[*] ? (@."@xsi:type" == "ReroutingManagement" && exists(@.forVehiclesWithCharacteristicsOf))') as detour_vehicles
+         jsonb_path_exists(dp.p, '$.situationRecord[*] ? (@."@xsi:type" == "ReroutingManagement" && exists(@.forVehiclesWithCharacteristicsOf))') as detour_vehicles
   from page p
   join road_events x on x.id = p.id and x.deleted_at is null and coalesce(x.confidentiality, 'noRestriction') = 'noRestriction'
+  cross join lateral (select x.payload #> '{}' as p offset 0) dp
   cross join lateral (
-    select coalesce(x.payload -> 'situationExtension' -> 0 -> 'situationExtended' -> 0 -> 'overallSituation' -> 0,
-                    x.payload -> 'situationRecord' -> 0) as n
+    select coalesce(dp.p -> 'situationExtension' -> 0 -> 'situationExtended' -> 0 -> 'overallSituation' -> 0,
+                    dp.p -> 'situationRecord' -> 0) as n
   ) o
   order by case when $6::float8 is null then array_position($1::text[], p.road_number) end,
            p.distance_m nulls last,

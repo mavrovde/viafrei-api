@@ -307,3 +307,77 @@ After the collapse each group is one or two stops, so the read stays far
 under the 2 s deadline and needs no bound. Before the change (generic,
 2026-11-26) Leipzig, Hauptbahnhof (Tram/Bus) took 25.5 ms and now 26.0
 ms; strasse 75.2 ms and now 50.6 ms.
+
+## Place resolve: the candidate read (#291)
+
+`GET /v1/places/resolve` spent its time in `api_place_candidates`, which
+the resolver runs one to three times per text: on prod (2026-11-27, quiet
+database) six resolves made 11 calls of it at 471 ms each (the
+`pg_stat_statements` mean over those calls), 27 700 buffers
+each, 5.2 s of the 6.7 s their reads took. Its plans, with `EXPLAIN
+(ANALYZE, BUFFERS)` of the prepared statement, read only:
+
+- the fuzzy match was one OR over both spellings and the suffix rule, so
+  the bitmap heap scan rechecked every arm on every trigram candidate:
+  36 000 candidates for "bamberg" (every "...berg" shares its trigrams),
+  each tested twice when the expanded spelling is the folded one (most
+  texts), the larger part of each run;
+- the prefix-qualified namesakes ("bad <text>", "neu <text>", ...) were a
+  join of the 16 patterns to the table, planned as a sequential scan of
+  390 000 rows (105-215 ms, 17 500 buffers), whatever the text;
+- in the generic plan the answer rows were every fold nested over every
+  row read: 214 000 rows filtered for "bamberg" (145 ms).
+
+Now one arm per spelling and rule, an arm of the expanded spelling only
+when it differs (a one-time filter), the suffix rule as a byte range on the
+`text_pattern_ops` btree (a `LIKE` with a parameter pattern never used it in
+the generic plan), the namesakes as one range probe per pattern, and each
+fold's rows read by its name. Rows: 16 texts, custom and generic plan, old
+and new statement in one transaction on prod, the same rows each.
+
+| Text | custom before | custom after | generic before | generic after | buffers before → after |
+|-|-|-|-|-|-|
+| bamberg | 455 ms | 213 ms | 689 ms | 316 ms | 29 503 → 11 791 |
+| alexanderplatz | 229 ms | 43 ms | 345 ms | 50 ms | 20 958 → 3 101 |
+| berlin | 222 ms | 93 ms | 1 596 ms | 130 ms | 37 809 → 20 207 |
+| munchen / muenchen | 266 ms | 265 ms | 594 ms | 267 ms | 31 139 → 20 013 |
+| neustadt | 506 ms | 147 ms | 833 ms | 188 ms | 27 303 → 10 123 |
+| homburg | 285 ms | 134 ms | 443 ms | 139 ms | 25 207 → 6 713 |
+| ulm | 119 ms | 13 ms | 102 ms | 9 ms | 19 162 → 1 079 |
+| essen | 764 ms | 374 ms | 898 ms | 409 ms | 32 433 → 14 066 |
+| wurzburg / wuerzburg | 321 ms | 270 ms | 485 ms | 360 ms | 25 898 → 12 228 |
+| frankfurt | 458 ms | 81 ms | 456 ms | 64 ms | 24 697 → 6 487 |
+| bad | 744 ms | 170 ms | 683 ms | 204 ms | 27 668 → 10 520 |
+| marienplatz (stations only) | 130 ms | 69 ms | 192 ms | 99 ms | 8 236 → 7 014 |
+
+What stays is the trigram recheck itself: a text whose trigrams many names
+share ("essen", "wurzburg") still rechecks thousands of candidates on the
+heap, which the trigram GIN cannot narrow further.
+`TestPlaceCandidatesPlan` holds the plan's shape (no read of a whole index,
+each fold by its name, nothing read for a repeated spelling).
+
+## Motorway conditions: the plan sources' texts (#290)
+
+`api_road_shapes`, which the issue named, is not read on a request: it is
+the road shapes' snapshot, renewed off the request every five minutes, and
+its plans equal its calls (865 / 854, 0.3 ms each) because each renewal
+lands on a connection that has not prepared it yet. A conditions answer
+(prod, 2026-11-27, A3 861 ms, storage 850 ms) runs about ten statements in
+turn, none above 270 ms; the largest are the sweep counts and events and the
+plan sources' entries (`api_road_status_planned`).
+
+The plan sources' entries derive their answer texts with eight JSON paths
+over each entry's payload, a road publication of up to 4.5 MB as text
+(37 kB stored, compressed): each path decompressed the stored value again.
+In one ablation run (the statement with the paths replaced by nulls) A3
+took 39 ms where the statement as it was took 324 ms. The payload is now
+decompressed once per entry, in a lateral kept apart by `offset 0`
+(`#> '{}'` is the whole value). A3, the same transaction, six runs each,
+alternating: 319-568 ms (median 360) before, 170-385 ms (median 210) after.
+Rows: A1-A10, A40, A99, B9 at limit 1 and 20, the same before and after.
+`TestRoadStatusPlannedPayloadOnce` holds it (no path reads the stored
+column; one node computes the decompressed value).
+
+What stays is the paths' own walk of the large publications (the
+recursive `.**` paths); the texts could be stored at write time, as the
+entry facts are, which is a schema change.

@@ -25,6 +25,26 @@ const gazetteerCols = `g.id::text as id, g.kind, g.name, g.name_norm, g.name_en,
 // the Gemeinde rule, $6/$7 a kind and source the final rows are narrowed to,
 // $8/$9 the prefix-qualified patterns of $1 and $2; $10 the families.
 //
+// The platform's rows, read so that no part reads a whole table or index
+// and no candidate is tested twice (#291; "bamberg" on prod, EXPLAIN
+// ANALYZE 2026-11-27: 455 ms custom, 689 ms generic, 29 503 buffers):
+//   - hits: one arm per spelling and rule, so each bitmap heap scan
+//     rechecks its own condition only. The platform's one OR rechecked every
+//     arm on every trigram candidate (36 000 for "bamberg", whose trigrams
+//     every "...berg" shares), the same similarity twice when $2 is $1. An
+//     arm of $2 runs only when $2 is not $1 (whose rows it would repeat): a
+//     one-time filter. The suffix rule ("<q> %") is the byte range
+//     [q || ' ', q || '!') on the text_pattern_ops btree, which a LIKE with a
+//     parameter pattern never uses in the generic plan; a fold is letters,
+//     digits and single spaces, so the range holds exactly the rows LIKE
+//     matched.
+//   - the prefix-qualified namesakes: one range probe per pattern on that
+//     btree (a lateral kept apart by offset 0), where the join of the
+//     patterns to the table was planned as a scan of 390 000 rows.
+//   - the answer rows: each fold's rows by its name (a lateral kept apart),
+//     where the generic plan nested every fold over every row read (214 000
+//     rows filtered for "bamberg").
+//
 //nolint:misspell // materialized is the SQL keyword
 var placeCandidates = named("api_place_candidates", `
 with exact as materialized (
@@ -33,23 +53,34 @@ with exact as materialized (
    where closed_at is null and name_norm in ($1::text, $2::text) and admin_code ~ '^[0-9]{8}$'
 ),
 hits as (
+  select id from gazetteer_places where closed_at is null and name_norm % $1::text
+  union
+  select id from gazetteer_places where $2::text <> $1::text and closed_at is null and name_norm % $2::text
+  union
   select id from gazetteer_places
-   where closed_at is null
-     and (name_norm % $1::text or name_norm % $2::text
-          or ($5::boolean and name_norm like $1::text || ' %' and population > 0 and admin_code ~ '^[0-9]{8}$')
-          or ($5::boolean and name_norm like $2::text || ' %' and population > 0 and admin_code ~ '^[0-9]{8}$'))
+   where $5::boolean and closed_at is null
+     and name_norm ~>=~ ($1::text || ' ') and name_norm ~<~ ($1::text || '!')
+     and population > 0 and admin_code ~ '^[0-9]{8}$'
+  union
+  select id from gazetteer_places
+   where $5::boolean and $2::text <> $1::text and closed_at is null
+     and name_norm ~>=~ ($2::text || ' ') and name_norm ~<~ ($2::text || '!')
+     and population > 0 and admin_code ~ '^[0-9]{8}$'
   union
   select id from gazetteer_places where closed_at is null and name_en is not null and lower(name_en) % $1::text
   union
-  select id from gazetteer_places where closed_at is null and name_en is not null and lower(name_en) % $2::text
+  select id from gazetteer_places where $2::text <> $1::text and closed_at is null and name_en is not null and lower(name_en) % $2::text
   union
   select g.id
     from (select distinct pat from unnest($8::text[] || $9::text[]) as u(pat)) as p
-    join gazetteer_places g
-      on g.name_norm ~>=~ replace(p.pat, '%', '')
-     and g.name_norm ~<~ (case when right(p.pat, 1) = '%' then left(p.pat, -2) || '!' else p.pat || chr(1) end)
-   where $5::boolean and g.closed_at is null
-     and g.population > 0 and g.population >= (select population from exact) and g.admin_code ~ '^[0-9]{8}$'
+    cross join lateral (
+      select g.id from gazetteer_places g
+       where g.closed_at is null
+         and g.name_norm ~>=~ replace(p.pat, '%', '')
+         and g.name_norm ~<~ (case when right(p.pat, 1) = '%' then left(p.pat, -2) || '!' else p.pat || chr(1) end)
+         and g.population > 0 and g.population >= (select population from exact) and g.admin_code ~ '^[0-9]{8}$'
+      offset 0) g
+   where $5::boolean
 ),
 scored as (
   select id, name_norm,
@@ -70,17 +101,19 @@ scored as (
     from gazetteer_places
    where id = any (array(select id from hits))
 ),
-folds as (
+folds as materialized (
   select name_norm, max(score) as score, max(qualified) as qualified from scored group by name_norm
 )
 select `+gazetteerCols+`,
        greatest(f.score, case when g.kind in ('station', 'stop') then 0::double precision else f.qualified end) as score
-  from gazetteer_places g
-  join folds f on f.name_norm = g.name_norm
- where g.closed_at is null
-   and g.name_norm = any (array(select name_norm from folds))
-   and ($6::text is null or (g.kind = $6::text and g.source_id = $7::text))
-   and g.source_id = any((select $10::text[])::text[])
+  from folds f
+  cross join lateral (
+    select g.id, g.kind, g.name, g.name_norm, g.name_en, g.admin_code, g.population, g.road, g.rank, g.source_id, g.external_id, g.geom
+      from gazetteer_places g
+     where g.closed_at is null and g.name_norm = f.name_norm
+       and ($6::text is null or (g.kind = $6::text and g.source_id = $7::text))
+       and g.source_id = any((select $10::text[])::text[])
+     offset 0) g
  order by score desc, g.rank desc, g.name asc, g.source_id asc, g.external_id asc
  limit $4::integer`, "text", "text", "double precision", "integer", "boolean", "text", "text", "text[]", "text[]", "text[]")
 

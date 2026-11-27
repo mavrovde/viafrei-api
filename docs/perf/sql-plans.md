@@ -279,3 +279,31 @@ answers the same row.
 - The drop of the real-time departures' coalesce index is coordinated: no API statement needs it.
 - The DB station register's EVA number has no index (8 800 rows, a scan of about 1 ms; not
   needed now).
+
+## Station text search: the ties of one name (#229 B)
+
+With a text and no position every key's distance is null, so the key
+CTE's cut (`rank()` over distance and name) keeps the whole group of one
+exact name at the limit, and the page reads the full row and the planned
+calls of each key in it before it cuts at the limit. The group is counted
+after the collapse of platforms into their station (ownStation), which
+runs before the cut.
+
+The largest groups of one name among the stops a station search reads
+(prod, 2026-11-27, before the collapse): Bonn Hbf 48, Wiesdorf Leverkusen
+Mitte Bf 37, Köln Wahn S-Bahn 36, Köln Chorweiler 36, Regensburg Hbf 35.
+The prepared statement on its generic plan (22 generic, 5 custom), limit
+1 and 10 (the statement is asked one more):
+
+| Text | limit 1 | limit 10 |
+|-|-|-|
+| Bonn Hbf | 27.4 ms | 34.6 ms |
+| Wiesdorf Leverkusen Mitte Bf | 19.4 ms | 42.6 ms |
+| Köln Wahn S-Bahn | 21.6 ms | 24.0 ms |
+| Köln Chorweiler | 20.4 ms | 21.2 ms |
+| Regensburg Hbf | 61.5 ms | 71.6 ms |
+
+After the collapse each group is one or two stops, so the read stays far
+under the 2 s deadline and needs no bound. Before the change (generic,
+2026-11-26) Leipzig, Hauptbahnhof (Tram/Bus) took 25.5 ms and now 26.0
+ms; strasse 75.2 ms and now 50.6 ms.

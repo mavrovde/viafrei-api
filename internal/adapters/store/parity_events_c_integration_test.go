@@ -29,7 +29,6 @@ func init() {
 		"api_road_covering":       coveringCases,
 		"api_road_lamp_messages":  roadLampMessageCases,
 		"api_road_sources":        sourceCases,
-		"api_motorway_families":   motorwayFamilyCases,
 		"api_motorways":           motorwaysCases,
 		"api_motorways_live_land": motorwaysCases,
 		"api_feeding":             feedingCases,
@@ -205,16 +204,6 @@ func sourceCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
 	return [][]any{{all}, {all[:1]}, {[]string{}}}
 }
 
-func motorwayFamilyCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
-	var out [][]any
-	for _, f := range eventFamilies(t, ctx, c) {
-		for _, at := range eventTimes(t, ctx, c) {
-			out = append(out, []any{f, at})
-		}
-	}
-	return out
-}
-
 func motorwaysCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
 	refs := column(t, ctx, c, `select road from public.autobahn_roads order by 1 limit 3`)
 	lands := column(t, ctx, c, `select distinct contract_junction_land(geom) from public.tmc_locations
@@ -226,7 +215,8 @@ func motorwaysCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
 			for _, l := range lands {
 				out = append(out, []any{f, l, "", 100, at, refs[:1]})
 			}
-			for _, r := range refs {
+			// "A0" keeps no road: one row carries the families counted.
+			for _, r := range append(refs, "A0") {
 				out = append(out, []any{f, "", r, 100, at, []string{}})
 			}
 		}

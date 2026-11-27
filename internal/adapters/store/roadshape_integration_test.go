@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
@@ -194,4 +196,44 @@ func canonical(t *testing.T, s string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// The motorway catalogue counts the families of the situations in force on
+// any road of the register, whatever the query keeps (a Land, one road, no
+// road at all), as the frozen families statement read them on its own.
+func TestMotorwaysCountTheFamiliesOfEveryRoad(t *testing.T) {
+	req.Covers(t, "NFR-PERF-001")
+	ctx := bounded(t)
+	now := time.Now()
+	var fams []string
+	var ref string
+	owner(t, `select coalesce(array_agg(distinct source_ref order by source_ref), '{}') from contract.traffic_event`, &fams)
+	owner(t, `select road_ref from contract.road order by road_ref limit 1`, &ref)
+	conn, err := pgx.Connect(ctx, db.ReaderURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	var want []string
+	if err := conn.QueryRow(ctx, store.LegacyMotorwayFamilies(), fams, now).Scan(&want); err != nil {
+		t.Fatal(err)
+	}
+	if len(want) == 0 {
+		t.Fatal("no family is counted on the fixture: the case proves nothing")
+	}
+	st := seeded(t)
+	for _, q := range []roads.CatalogueQuery{{Limit: 500}, {Limit: 1}, {Road: ref, Limit: 1}, {Road: "A0", Limit: 1}, {State: "not a Land", Limit: 5}} {
+		ms, counted, err := st.Motorways(ctx, q, fams, now)
+		if err != nil {
+			t.Fatalf("%+v: %v", q, err)
+		}
+		if !slices.Equal(counted, want) {
+			t.Errorf("%+v: %d roads, families counted %q, want %q", q, len(ms), counted, want)
+		}
+	}
+	// No family asked: none is counted, and the roads are still listed.
+	ms, counted, err := st.Motorways(ctx, roads.CatalogueQuery{Limit: 500}, nil, now)
+	if err != nil || len(counted) != 0 || len(ms) == 0 {
+		t.Fatalf("no family: %d roads, %q, %v", len(ms), counted, err)
+	}
 }

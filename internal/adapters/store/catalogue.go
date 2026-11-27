@@ -56,23 +56,12 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 	}
 	var counted []string
 	ms, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Motorway, error) {
-		res, _ := run(ctx, tx, motorwayFamilies, families, now)
-		c, err := pgx.CollectExactlyOneRow(res, pgx.RowTo[[]string])
-		if err != nil {
-			return nil, err
-		}
+		// The situations in force are read once, grouped by road, not twice
+		// per road, and the families counted come from the same read
+		// (motorwaysOf).
+		res, _ := run(ctx, tx, list, families, q.State, q.Road, q.Limit, now, inState)
+		ms, c, err := collectMotorways(res, shapes)
 		counted = c
-		// The situations in force are read once and grouped by road, not
-		// twice per road (motorwaysOf).
-		res, _ = run(ctx, tx, list, families, q.State, q.Road, q.Limit, now, inState)
-		ms, err := pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Motorway, error) {
-			var m roads.Motorway
-			err := r.Scan(&m.Road, &m.Name, &m.Junctions, &m.Situations, &m.Family, &m.Sources, &m.Registers)
-			sh := shapes[m.Road]
-			// Never nil, as the view's coalesce(states, '{}') answered.
-			m.LengthKm, m.States = sh.lengthKm, append([]string{}, sh.states...)
-			return m, err
-		})
 		if err != nil || q.Road == "" || len(ms) == 0 {
 			return ms, err
 		}
@@ -90,21 +79,46 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 	return ms, counted, err
 }
 
-// motorwayFamilies reads the families of the situations in force at $2 on
-// a road of the register, of the families $1.
-var motorwayFamilies = opaqueNamed("api_motorway_families", `
-select coalesce(array_agg(distinct e.source_ref order by e.source_ref), '{}')
-from `+trafficEventsOf("")+` e
-join autobahn_roads r on r.road = e.road_ref
-where e.source_ref = any($1) and `+eventPermitted+`
-  and e.withdrawn_at is null and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`, "text[]", "timestamptz")
+// collectMotorways reads the rows of motorwaysOf: the roads, each with its
+// length and Länder from shapes, and the families counted, which every row
+// carries and a row without a road (no road kept) carries alone.
+func collectMotorways(res pgx.Rows, shapes map[string]roadShape) ([]roads.Motorway, []string, error) {
+	var counted []string
+	ms := []roads.Motorway{}
+	for res.Next() {
+		var (
+			road, name, family    *string
+			junctions, situations *int
+			m                     roads.Motorway
+		)
+		if err := res.Scan(&road, &name, &junctions, &situations, &family, &m.Sources, &m.Registers, &counted); err != nil {
+			res.Close()
+			return nil, nil, err
+		}
+		if road == nil {
+			continue
+		}
+		m.Road, m.Name, m.Junctions, m.Situations, m.Family = *road, *name, *junctions, *situations, *family
+		sh := shapes[m.Road]
+		// Never nil, as the view's coalesce(states, '{}') answered.
+		m.LengthKm, m.States = sh.lengthKm, append([]string{}, sh.states...)
+		ms = append(ms, m)
+	}
+	if err := res.Err(); err != nil {
+		return nil, nil, err
+	}
+	return ms, counted, nil
+}
 
 // motorwaysOf reads the roads of the register, by length of reference then
 // reference, at most $4: each with its number of junctions, its situations
 // in force at $5 of the families $1 (counted and their families, read once
 // and grouped by road), its family and the registers of its junctions. $2 a
 // Land (” every road): the roads $6 in it, and with liveLand those with a
-// junction in it; $3 one road (” every road).
+// junction in it; $3 one road (” every road). Each row also carries the
+// families of the situations in force on any road of the register, whatever
+// the query keeps, from the same read of the situations: one row with no
+// road carries them when no road is kept.
 func motorwaysOf(name string, liveLand bool) stmt {
 	inLand := ``
 	if liveLand {
@@ -113,21 +127,29 @@ func motorwaysOf(name string, liveLand bool) stmt {
                   and contract_junction_land(t.geom) = $2::text)`
 	}
 	return opaqueNamed(name, `
-with es as (
+with es as materialized (
   select e.road_ref, count(*)::int as n, array_agg(distinct e.source_ref order by e.source_ref) as sources
   from `+trafficEventsOf("")+` e
   where e.source_ref = any($1) and `+eventPermitted+`
     and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
-  group by e.road_ref)
-select r.road, r.road, jc.n, coalesce(es.n, 0), 'autobahn', coalesce(es.sources, '{}'),
-       case when jc.n > 0 then array['bast_lcl'] else '{}'::text[] end
-from autobahn_roads r
-cross join lateral (select count(*)::int n from tmc_locations t where t.road_number = r.road and `+motorwayJunctions+`) jc
-left join es on es.road_ref = r.road
-where ($2::text = '' or r.road = any($6::text[])`+inLand+`)
-  and ($3::text = '' or r.road = $3::text)
-order by length(r.road), r.road
-limit $4`, "text[]", "text", "text", "int8", "timestamptz", "text[]")
+  group by e.road_ref),
+counted as (
+  select coalesce(array_agg(distinct f.f order by f.f), '{}') families
+  from es join autobahn_roads r on r.road = es.road_ref cross join unnest(es.sources) f(f)),
+m as (
+  select r.road, jc.n junctions, coalesce(es.n, 0) situations, coalesce(es.sources, '{}') sources,
+         case when jc.n > 0 then array['bast_lcl'] else '{}'::text[] end registers
+  from autobahn_roads r
+  cross join lateral (select count(*)::int n from tmc_locations t where t.road_number = r.road and `+motorwayJunctions+`) jc
+  left join es on es.road_ref = r.road
+  where ($2::text = '' or r.road = any($6::text[])`+inLand+`)
+    and ($3::text = '' or r.road = $3::text)
+  order by length(r.road), r.road
+  limit $4)
+select m.road, m.road, m.junctions, m.situations, case when m.road is not null then 'autobahn' end, m.sources, m.registers, c.families
+from counted c
+left join m on true
+order by length(m.road), m.road`, "text[]", "text", "text", "int8", "timestamptz", "text[]")
 }
 
 var (

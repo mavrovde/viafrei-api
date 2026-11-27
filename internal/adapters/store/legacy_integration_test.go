@@ -206,10 +206,12 @@ select exists (select 1 from contract.service_alert a where a.source_ref = any($
        (count(*) filter (where not o.duplicate))::int, (count(*) filter (where o.duplicate))::int,
        coalesce(array_agg(distinct o.source_ref order by o.source_ref), '{}')
 from o where $5::int >= 0 -- $5, the limit, is the list's alone`,
+	// The punctuality is the Trip Updates' figures too, published under
+	// 'tripupdates' (#222), as the trip delays below.
 	"api_area_punctuality": opaque(`select p.area_level, p.area_code, p.area_name, p.trips_observed, p.trips_late, p.trips_skipped_stop, p.trips_untimed,
-       p.median_worst_delay_s, p.stops_seen, p.observed_at, p.source_ref
+       p.median_worst_delay_s, p.stops_seen, p.observed_at, case when p.source_ref = 'delfi_rt_tu' then 'tripupdates' else p.source_ref end
 from contract.transit_punctuality p
-where p.area_code = $1 and p.source_ref = any($2) and `+permitted("p")+`
+where p.area_code = $1 and case when p.source_ref = 'delfi_rt_tu' then 'tripupdates' else p.source_ref end = any($2) and `+permitted("p")+`
 order by p.area_level
 limit 1`, "text", "text[]"),
 	// The trip delays are the Trip Updates' figures, published under that
@@ -259,10 +261,10 @@ where f.withdrawn_at is null and f.source_ref = any($1) and ` + permitted("f") +
 group by 2, 4
 order by 1, 2, 4`,
 	"api_national_transit": `
-select 'punctuality', p.area_level || ':' || p.area_code, p.area_name, p.source_ref, p.trips_observed, p.trips_late,
+select 'punctuality', p.area_level || ':' || p.area_code, p.area_name, case when p.source_ref = 'delfi_rt_tu' then 'tripupdates' else p.source_ref end, p.trips_observed, p.trips_late,
        null, p.median_worst_delay_s::float8
 from contract.transit_punctuality p
-where p.source_ref = any($1) and ` + permitted("p") + ` and $2::timestamptz is not null
+where case when p.source_ref = 'delfi_rt_tu' then 'tripupdates' else p.source_ref end = any($1) and ` + permitted("p") + ` and $2::timestamptz is not null
 order by 1, 2, 4`,
 	"api_national_accessibility": `
 select 'facilities', f.facility_kind || '/' || coalesce(f.facility_status, 'unknown'), null::text, f.source_ref,

@@ -126,7 +126,7 @@ var (
            m.distance_m nulls last,
            m.title, m.ext_id`, "text[]", "timestamptz[]", "text[]", "text[]", "int", "float8", "float8", "float8", "timestamptz", "timestamptz", "boolean")
 	// The answer rows' texts are read from each entry's payload (the plan
-	// sources' DATEX II publications: up to 4 MB as text, 37 kB stored): the
+	// sources' publications: up to 4.5 MB as text, 37 kB stored): the
 	// payload is decompressed once per entry (dp, kept apart by offset 0;
 	// #> '{}' is the whole value), where each of the eight paths over it
 	// decompressed it again (#290: A3 324 -> 160 ms on prod).

@@ -366,7 +366,7 @@ turn, none above 270 ms; the largest are the sweep counts and events and the
 plan sources' entries (`api_road_status_planned`).
 
 The plan sources' entries derive their answer texts with eight JSON paths
-over each entry's payload, a DATEX II publication of up to 4.5 MB as text
+over each entry's payload, a road publication of up to 4.5 MB as text
 (37 kB stored, compressed): each path decompressed the stored value again.
 Dropping the paths took A3 from 324 to 39 ms. The payload is now
 decompressed once per entry, in a lateral kept apart by `offset 0`

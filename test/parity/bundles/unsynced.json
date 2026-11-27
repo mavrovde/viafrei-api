@@ -6451,10 +6451,6 @@
           "value": "60"
         },
         {
-          "name": "meta.attribution[delfi_rt_tu].family",
-          "value": "delfi_rt_tu"
-        },
-        {
           "name": "meta.attribution[delfi_sa_alpha].family",
           "value": "delfi_sa_alpha"
         },
@@ -6565,10 +6561,6 @@
         {
           "name": "data.windowMin",
           "value": "60"
-        },
-        {
-          "name": "meta.attribution[delfi_rt_tu].family",
-          "value": "delfi_rt_tu"
         },
         {
           "name": "meta.attribution[delfi_sa_alpha].family",

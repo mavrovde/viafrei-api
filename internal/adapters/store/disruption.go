@@ -124,16 +124,15 @@ var lineInTimetable = namedOpaque("api_line_in_timetable", `select exists (selec
        coalesce((select array_agg(distinct l.source_ref order by l.source_ref) from (`+relTransitLine+`) l
                   where upper(regexp_replace(l.line_name, '\s+', '', 'g')) = $1::text and l.source_ref = any($2) and `+permitted("l")+`), '{}')`, "text", "text[]")
 
-// punctualityFamily is the family contract.transit_punctuality is of (its
-// source_ref): the DELFI Trip Updates under its licence's id, not the
-// family the register publishes (tripUpdatesFamily), so a key holding the
-// published family is given no area punctuality. Stamped with the
-// published family, the read is served and takes 2 to 6 s on prod
-// (2026-11-24): transit_punctuality_area_live counts all sixteen Länder in
-// a materialised CTE no area filter reaches, and the API's role may not
-// read the untimed-trips relation a read of one Land would need. It
-// waits for the database to give a Land's punctuality.
-const punctualityFamily = "delfi_rt_tu"
+// punctualityFamily is the family an area's punctuality is read under: the
+// DELFI Trip Updates as the register publishes them (tripUpdatesFamily),
+// like a board's figures and an area's trip delays. The relation stamped the
+// licence's id, a family no key holds where the source owns its licence's
+// row, so every area answered no punctuality though the rows were held
+// (Hamburg, Köln and every Land on prod, 2026-11-27). It was held back while
+// the read counted all sixteen Länder (2 to 6 s); bound to the area's Land
+// (punctualityOfArea) it takes 26 to 55 ms.
+const punctualityFamily = "tripupdates"
 
 // Disruptions reads the alerts and the punctuality q asks for
 // (features.Disruptions).

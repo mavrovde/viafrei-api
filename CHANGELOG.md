@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.5](https://github.com/mavrovde/viafrei-api/compare/v2.0.4...v2.0.5) (2026-11-27)
+
+
+### Fixed
+
+* release 2.0.5 - place resolve candidate read by index, motorway plan texts decompress each payload once ([#292](https://github.com/mavrovde/viafrei-api/issues/292)) ([8b55983](https://github.com/mavrovde/viafrei-api/commit/8b55983ceb9f3d10c1132c021a1b7a2f3406ccbb))
+
 ## [2.0.4](https://github.com/mavrovde/viafrei-api/compare/v2.0.3...v2.0.4) (2026-11-27)
 
 

@@ -70,14 +70,25 @@ func principalFrom(ctx context.Context) auth.Principal {
 // presented returns the key of the request: the bearer token, else the
 // X-API-Key header.
 func presented(ctx huma.Context) string {
-	if h := ctx.Header("Authorization"); h != "" {
-		scheme, token, _ := strings.Cut(h, " ")
+	return presentedKey(ctx.Header("Authorization"), ctx.Header(APIKeyHeader))
+}
+
+// presentedIn is presented, from a request's header.
+func presentedIn(h http.Header) string {
+	return presentedKey(h.Get("Authorization"), h.Get(APIKeyHeader))
+}
+
+// presentedKey is the bearer token of authorization, else the X-API-Key
+// value apiKey; nothing for another scheme.
+func presentedKey(authorization, apiKey string) string {
+	if authorization != "" {
+		scheme, token, _ := strings.Cut(authorization, " ")
 		if strings.EqualFold(scheme, "Bearer") {
 			return strings.TrimSpace(token)
 		}
 		return ""
 	}
-	return strings.TrimSpace(ctx.Header(APIKeyHeader))
+	return strings.TrimSpace(apiKey)
 }
 
 // clientAddress is the request's client address as withClient found it,
@@ -182,7 +193,7 @@ func GateViolations() int64 { return gateViolations.Load() }
 // rateLimitDoc pins the draft revision whose syntax the RateLimit fields
 // follow (RATE-006).
 const rateLimitDoc = "Sent on every keyed answer but a 401, success or error, in the syntax of " + RateLimitDraft +
-	": a burst policy, and a day and a month policy for a plan with those quotas."
+	": a burst policy, and a day and a month policy for a plan with those quotas. An overloaded refusal carries the policy but no RateLimit field: it was refused under load, not by the key's budget."
 
 // keyedResponses documents the refusals every keyed operation may answer
 // besides its own: a 401 carries the WWW-Authenticate challenge (RFC 6750).

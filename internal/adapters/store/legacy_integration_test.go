@@ -50,6 +50,14 @@ found as (
     and s.location is not null
     and s.source_ref = any($8)
     and ` + permitted("s") + `
+    -- carried on purpose (#192): a stop of another station is that
+    -- station, as the station search collapses it
+    and not exists (
+        select 1 from contract.stop_place r
+         where r.withdrawn_at is null and r.stop_place_id <> s.stop_place_id
+           and (r.stop_place_id = split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `')
+                or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
+                    and r.stop_place_id ~<~ s.stop_place_id)))
   union all
   select r.road_ref, r.road_ref, 'motorway', pt.location, null, r.source_ref, 0, null, null, false
   from contract.road r
@@ -321,8 +329,23 @@ where s.withdrawn_at is null
            and (r.stop_place_id = split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `')
                 or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
                     and r.stop_place_id ~<~ s.stop_place_id)))
-order by s.name, s.stop_place_id
+order by s.name, ` + legacyStationTies + `, s.stop_place_id
 limit $5`
+
+// legacyStationTies is a deliberate rule change carried into the frozen
+// station searches (#229 B, #191 A3): the stops of one name a text finds
+// come with an EVA number first, then those whose family has a planned call
+// of a live trip, then those filed under a DHID, then by id, as the
+// platform's stop resolver weighs them; legacyTextTies the same for a text
+// search only, a search with no text keeping its order. The keys are the
+// statement's own (stationTies, over the view's row): what the replay
+// holds to the frozen order is the page, a sort of every match against the
+// statement's ranked cut of each name at its limit. Both are cut at
+// exactly the limit, in a total order (id last): ties never lengthen a page.
+var (
+	legacyStationTies = stationTies("s")
+	legacyTextTies    = `case when $4::text = '' then null else array[` + legacyStationTies + `] end`
+)
 
 func init() {
 	legacyReads["api_stations_in_towns"] = legacyStationsInTowns
@@ -362,7 +385,7 @@ where s.withdrawn_at is null
                 or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
                     and r.stop_place_id ~<~ s.stop_place_id))))
 order by case when here.g is null and not (s.search_fold like $4::text || '%' or s.search_fold like any(array(select x || '%' from unnest($10::text[]) x))) then 1 else 0 end,
-         dist, s.name, s.stop_place_id
+         dist, s.name, ` + legacyTextTies + `, s.stop_place_id
 limit $6`
 
 // LegacyRead is the frozen view statement the named statement name replaced.

@@ -315,6 +315,16 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		}
 		return keyedRoutes[r.Method+" "+router.Find(chi.NewRouteContext(), r.Method, path)]
 	}
+	// serviceRoutes are the service operations (liveness, readiness, the
+	// metadata and the pressure word): gate 1 never refuses them (#155).
+	serviceRoutes := map[string]bool{}
+	service := func(r *http.Request) bool {
+		path := r.URL.RawPath
+		if path == "" {
+			path = r.URL.Path
+		}
+		return serviceRoutes[r.Method+" "+router.Find(chi.NewRouteContext(), r.Method, path)]
+	}
 	// recoverPanics runs inside withRequest, so a panic's problem and log
 	// line carry the request id, the instance and the absolute type, and
 	// inside accessLog, so the 500 it writes is logged like any answer.
@@ -323,17 +333,24 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		withRequest(base),
 		withClient(TrustedProxies(d.Config.Server.TrustedProxies)),
 		accessLog(s.log, s.now),
+		headAsGet,
 		compress(d.Config.HTTP.CompressMinBytes, d.Config.HTTP.CompressLevel),
 		recoverPanics(s.log),
 		refuseKeyInQuery(access.Prefixes{Live: d.Config.Auth.KeyPrefixLive, Test: d.Config.Auth.KeyPrefixTest}),
 		limitURI(d.Config.Server.MaxURIBytes),
-		limitAddress(d.Addresses, keyed),
+		limitAddress(d.Addresses, keyed, service, s.chargeKey),
 		withDeadline(d.Config.Deadline.Request),
+		withoutRemainingOnShed,
 	)
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, newProblem(r.Context(), SlugNotFound, "Nothing exists at this path.", 0))
 	})
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.RawPath
+		if path == "" {
+			path = r.URL.Path
+		}
+		w.Header().Set("Allow", allowed(router, path))
 		writeProblem(w, newProblem(r.Context(), SlugMethodNotAllowed, "This method is not supported on this path.", 0))
 	})
 
@@ -343,7 +360,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			Info: &huma.Info{
 				Title:       Title,
 				Version:     InterfaceVersion,
-				Description: "Keyed, read-only access to live German mobility context. This document is generated from the code.",
+				Description: "Keyed, read-only access to live German mobility context. HEAD mirrors every GET operation without a body, and a 405 names the methods its path serves in Allow. This document is generated from the code.",
 				License:     &huma.License{Name: "Terms of use", URL: "https://viafrei.de/"},
 				Contact:     &huma.Contact{Name: "ViaFrei API maintainers", URL: "https://github.com/mavrovde/viafrei-api/issues"},
 			},
@@ -391,6 +408,9 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		hop := huma.Operation{OperationID: op.id, Method: op.method, Path: op.path, Tags: []string{"service"}}
 		if op.tag != "" {
 			hop.Tags = []string{op.tag}
+		}
+		if op.surface&onHealth != 0 {
+			serviceRoutes[op.method+" "+op.path] = true
 		}
 		if op.keyed {
 			keyedRoutes[op.method+" "+op.path] = d.Auth != nil

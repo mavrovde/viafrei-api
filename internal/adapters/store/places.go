@@ -139,7 +139,11 @@ func placeRows(h string) string {
 }
 
 // stopRows are the stops of a stop family of $8 whose name meets match,
-// ranked by rank, in the columns of the place search's candidates.
+// ranked by rank, in the columns of the place search's candidates. A stop
+// of another station (ownStation: a platform DELFI files under a station's
+// DHID) is that station, not a place of its own, as the station search
+// collapses it (#192: "Marienplatz" listed Stuttgart's Marienplatz and two
+// of its platforms, 100 m apart, as three places).
 func stopRows(rank, match string) string {
 	return `select s.gtfs_feed_key::text || ':' || s.id, s.name, 'station_area', s.geom::geometry(Point,4326), split_part(s.id, ':', 2), true,
          f.source_feed, ` + rank + `, null, null, null
@@ -148,7 +152,8 @@ func stopRows(rank, match string) string {
   where ` + match + `
     and s.deleted_at is null and s.geom is not null and s.name is not null
     and (s.location_type = 1 or coalesce(s.location_type::integer, 0) = 0 and s.parent_id is null)
-    and f.source_feed = any((select $8::text[])::text[])`
+    and f.source_feed = any((select $8::text[])::text[])
+    and ` + ownStation("(s.gtfs_feed_key::text || ':' || s.id)")
 }
 
 // placesPicked are the first $7 candidates of c of the kind $3 within the

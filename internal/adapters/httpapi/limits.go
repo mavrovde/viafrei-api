@@ -137,25 +137,76 @@ func TrustedProxies(cidrs []string) []netip.Prefix {
 
 // limitAddress is gate 1 (RATE-001, SEC-051): a request takes a token of
 // its client address's bucket before anything else is done for it, unless
-// it presents a key to an operation that checks one. keyed tells whether
-// the request routes to such an operation. A key presented there is
-// governed by its key's bucket instead, and by the per-address limit on
-// failed key checks when it is refused (SEC-052). A header presented
-// anywhere else (a service operation, an unknown path) is checked by
-// nothing, so it buys nothing: the address is charged.
-func limitAddress(gate AddressGate, keyed func(*http.Request) bool) func(http.Handler) http.Handler {
+// it presents a key to an operation that checks one, or asks for a service
+// operation (liveness, readiness, the metadata, the pressure word: #155),
+// which gate 1 never refuses. keyed tells whether the request routes to
+// such an operation, service whether it routes to a service operation. A
+// key presented to a keyed operation is governed by its key's bucket
+// instead, and by the per-address limit on failed key checks when it is
+// refused (SEC-052). A key presented anywhere else (an unknown path, a
+// method the path does not serve) is checked by charge: a valid key's
+// request counts against that key's budget, never the address's (#151); a
+// key that is not valid buys nothing, the address is charged.
+func limitAddress(gate AddressGate, keyed, service func(*http.Request) bool, charge func(http.ResponseWriter, *http.Request) (*Problem, bool)) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			presents := r.Header.Get("Authorization") != "" || r.Header.Get(APIKeyHeader) != ""
-			if gate != nil && (!presents || !keyed(r)) {
-				if d := gate.Take(clientFrom(r.Context())); !d.Allowed {
-					writeProblem(w, newProblem(r.Context(), SlugRateLimited, "Too many requests without a key from this address.", limits.Seconds(d.RetryAfter)))
+			if gate == nil || service(r) || (presents && keyed(r)) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if presents {
+				if p, ok := charge(w, r); ok {
+					if p != nil {
+						writeProblem(w, p)
+						return
+					}
+					next.ServeHTTP(w, r)
 					return
 				}
+			}
+			if d := gate.Take(clientFrom(r.Context())); !d.Allowed {
+				writeProblem(w, newProblem(r.Context(), SlugRateLimited, "Too many requests without a key from this address.", limits.Seconds(d.RetryAfter)))
+				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// chargeKey checks the key a request presents to a route that checks none
+// (#151), within the request deadline: ok is false when no valid key is
+// presented, and the address is charged. A valid key's request takes a
+// token of the key's bucket and counts against its quotas, as a keyed
+// operation's request does, and carries its RateLimit fields; p is the
+// refusal when the key's budget is spent.
+func (s *server) chargeKey(w http.ResponseWriter, r *http.Request) (p *Problem, ok bool) {
+	if s.auth == nil {
+		return nil, false
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.Deadline.Request)
+	defer cancel()
+	principal, err := s.auth.Authenticate(ctx, presentedIn(r.Header), clientFrom(r.Context()))
+	if err != nil {
+		return nil, false
+	}
+	if s.keyGate == nil {
+		return nil, true
+	}
+	plan := planOf(principal.Key.Plan)
+	v := s.keyGate.Admit(ctx, principal.Key.ID, plan)
+	if s.cfg.RateLimit.Headers {
+		policy, state := rateLimitFields(plan, v)
+		w.Header().Set("RateLimit-Policy", policy)
+		w.Header().Set("RateLimit", state)
+	}
+	switch v.Refused {
+	case ratelimit.RateLimited:
+		return newProblem(r.Context(), SlugRateLimited, "The key's request rate is exceeded.", limits.Seconds(v.RetryAfter)), true
+	case ratelimit.QuotaExceeded:
+		return newProblem(r.Context(), SlugQuotaExceeded, "The key's quota is used up until the reset.", limits.Seconds(v.RetryAfter)), true
+	}
+	return nil, true
 }
 
 // outcome is what the storage reads of a keyed request report back for its
@@ -239,6 +290,7 @@ func (s *server) overloadedProblem(ctx context.Context, err error) (*Problem, bo
 		return nil, false
 	}
 	noteRefusal(ctx, metering.Overloaded)
+	markShed(ctx)
 	p := newProblem(ctx, SlugOverloaded, "The service is overloaded; retry after the time given.", limits.Seconds(r.RetryAfter))
 	p.Status = s.cfg.Admission.ShedStatus
 	return p, true

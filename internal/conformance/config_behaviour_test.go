@@ -157,6 +157,18 @@ func behaviours() map[string]behaviour {
 			}
 			return v.String()
 		}},
+		"health.ready_cache_ttl": {"100ms", func(t *testing.T, c *config.Config) string {
+			// Two checks 500 ms apart on a fixed clock moved by hand: the
+			// default interval answers the second from the first.
+			r := &countingReader{}
+			at := time.Unix(0, 0)
+			expected, _ := health.ExpectedVersion("", dbcontract.ContractVersion)
+			m := health.Memoise(health.NewChecker(r, expected, c.Health.ReadyTimeout), c.Health.ReadyCacheTTL, func() time.Time { return at })
+			m.Check(context.Background())
+			at = at.Add(500 * time.Millisecond)
+			m.Check(context.Background())
+			return fmt.Sprint(r.reads)
+		}},
 		"health.ready_timeout": {"1s", func(t *testing.T, c *config.Config) string {
 			expected, _ := health.ExpectedVersion("", dbcontract.ContractVersion)
 			return fmt.Sprint(health.NewChecker(slowReader{600 * time.Millisecond}, expected, c.Health.ReadyTimeout).Check(context.Background()).Ready)
@@ -438,4 +450,12 @@ func accessPool(t *testing.T, c *config.Config) string {
 		t.Fatal(err)
 	}
 	return fmt.Sprintf("%s:%d max=%d", pc.ConnConfig.Host, pc.ConnConfig.Port, pc.MaxConns)
+}
+
+// countingReader answers the built-in contract version and counts reads.
+type countingReader struct{ reads int }
+
+func (r *countingReader) ContractVersion(context.Context) (string, error) {
+	r.reads++
+	return dbcontract.ContractVersion, nil
 }

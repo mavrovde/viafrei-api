@@ -76,8 +76,10 @@ type NeedBlock struct {
 
 // NearbyData is the data of listNearby: each asked category that is ok.
 type NearbyData struct {
-	Fuel     *[]NearbyFuelStation `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most, each with its E5 price only."`
-	Charging *[]ChargingSite      `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
+	Fuel *[]NearbyFuelStation `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most, each with its E5 price only."`
+	// OSMFuel are OpenStreetMap's filling stations without a price.
+	OSMFuel  *[]OSMFuelStation `json:"osmFuel,omitempty" doc:"With fuel: OpenStreetMap's filling stations (ODbL) in the radius with no station we hold within 300 m, so no price yet, nearest first, three at most, as listFuelOptions' osmWithoutPrice; empty when there are none or the key may not read OpenStreetMap's places. Credited in meta.attribution."`
+	Charging *[]ChargingSite   `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
 	// ChargingRegister names the register release of the charging places.
 	ChargingRegister *NearbyChargingRegister `json:"chargingRegister,omitempty" doc:"Only with charging_group=place, when a Bundesnetzagentur register row is among the charging places: the register's release."`
 	Parking          *[]ParkingListing       `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
@@ -169,6 +171,8 @@ func nearbyEnvelope(s *server, ctx context.Context, a features.NearbyAnswer, q f
 	if a.Fuel != nil {
 		v := nearbyFuel(cheapest(*a.Fuel, fuelStations(*a.Fuel, q.FuelWindow), "e5"))
 		data.Fuel = &v
+		osm := osmFuelStations(a.Fuel.OSMWithoutPrice)
+		data.OSMFuel = &osm
 	}
 	if a.Charging != nil {
 		v := chargingSites(ctx, *a.Charging, s.cfg.Charging.StatusMaxAge)

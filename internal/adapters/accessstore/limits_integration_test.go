@@ -448,8 +448,10 @@ func TestAHigherTierKeepsItsLatencyUnderOverload(t *testing.T) {
 	}
 	for _, w := range shed {
 		ra, err := strconv.Atoi(w.Header().Get("Retry-After"))
-		if err != nil || ra < 1 || w.Header().Get("RateLimit") == "" {
-			t.Errorf("a shed answer without Retry-After or RateLimit: %v", w.Header())
+		// An overloaded refusal says when to come back and which policy the
+		// key holds, but no remaining value: the key's quota did not refuse it.
+		if err != nil || ra < 1 || w.Header().Get("RateLimit-Policy") == "" || w.Header().Get("RateLimit") != "" {
+			t.Errorf("a shed answer needs Retry-After and RateLimit-Policy and no RateLimit: %v", w.Header())
 		}
 	}
 	slices.Sort(times)

@@ -274,7 +274,7 @@ from contract.source s
 left join contract.source_freshness f using (source_ref)
 where s.source_ref = any($1)
 order by s.source_ref`
-	legacyReads["api_motorway_families"] = `
+	legacyMotorwayFamilies = `
 select coalesce(array_agg(distinct e.source_ref order by e.source_ref), '{}')
 from contract.traffic_event e
 join contract.road r on r.road_ref = e.road_ref and ` + permitted("r") + `
@@ -302,10 +302,28 @@ where ` + permitted("r") + `
 order by length(r.road_ref), r.road_ref
 limit $4`
 	}
-	legacyReads["api_motorways"] = motorways(``)
-	legacyReads["api_motorways_live_land"] = motorways(`
-       or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text)`)
+	// The roads carry the families counted (the frozen families statement,
+	// at the roads' instant $5) on every row, and alone on one row when no
+	// road is kept: the two frozen statements, side by side.
+	families := strings.ReplaceAll(legacyMotorwayFamilies, "$2", "$5")
+	withFamilies := func(roads string) string {
+		return `select m.road_ref, m.name, m.junctions, m.situations, m.family, m.sources, m.registers, c.families
+from (` + families + `) c(families)
+left join (` + roads + `) m(road_ref, name, junctions, situations, family, sources, registers) on true
+order by length(m.road_ref), m.road_ref`
+	}
+	legacyReads["api_motorways"] = withFamilies(motorways(``))
+	legacyReads["api_motorways_live_land"] = withFamilies(motorways(`
+       or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text)`))
 }
+
+// legacyMotorwayFamilies is the frozen statement of the families counted by
+// the motorway catalogue, the situations' families $1 in force at $2 on a
+// road of the register, before the catalogue's roads carried them.
+var legacyMotorwayFamilies string
+
+// LegacyMotorwayFamilies is legacyMotorwayFamilies, for the store's tests.
+func LegacyMotorwayFamilies() string { return legacyMotorwayFamilies }
 
 // The families of each dataset as the read contract's views held them,
 // verbatim from before the views were replaced.

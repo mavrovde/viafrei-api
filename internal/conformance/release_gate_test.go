@@ -91,6 +91,7 @@ const (
 	approveWait   = "${APPROVE_WAIT_S:-600}"
 	dispatchRun   = `gh workflow run release.yml --ref main -f tag="$TAG"`
 	pullRequestIf = "always() && needs.release.result == 'success' && (needs.tag.result == 'success' || needs.tag.result == 'skipped')"
+	approveIf     = "always() && needs.pull-request.result == 'success' && needs.pull-request.outputs.pr != ''"
 	rpAction      = "googleapis/release-please-action@"
 	publishedRef  = `gh api "repos/$GH_REPO/releases/tags/$TAG"`
 	imageExists   = `docker buildx imagetools inspect "$IMAGE:$VERSION"`
@@ -366,6 +367,9 @@ func releasePleaseFindings(files map[string][]byte, w gatedWorkflow) []string {
 	approve := string(files[approveScript])
 	ap := w.Jobs["approve"]
 	step := stepIndex(ap, func(s gatedStep) bool { return strings.Contains(s.Run, approveStep) })
+	if ap.If != approveIf {
+		out = append(out, "release-please.yml job approve does not run after a skipped tag job")
+	}
 	if step < 0 || !slices.Contains(needs(ap.Needs), "pull-request") || ap.Permissions["actions"] != "write" || !strings.Contains(approve, approveRun) || !strings.Contains(approve, "for wf in CI Security; do") {
 		out = append(out, "release-please.yml does not approve CI and Security on the release pull request")
 	}
@@ -519,6 +523,7 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"release-please.yml job pull-request does not run after the tag job (skipped tag refused)":                                  {plant("release-please.yml", pullRequestIf, "always() && needs.release.result == 'success' && needs.tag.result == 'success'"), s},
 		"release-please.yml job pull-request does not run after the tag job (after a failed tag)":                                   {plant("release-please.yml", "(needs.tag.result == 'success' || needs.tag.result == 'skipped')", "needs.tag.result != 'cancelled'"), s},
 		"runs the approval script without checking the repository out first":                                                        {plant("release-please.yml", "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - name: Approve", "      - name: Approve"), s},
+		"release-please.yml job approve does not run after a skipped tag job":                                                       {plant("release-please.yml", approveIf, "needs.pull-request.outputs.pr != ''"), s},
 		"does not approve CI and Security on the release pull request (no grant)":                                                   {plant("release-please.yml", "      actions: write # approves", "      actions: read # approves"), s},
 		"does not approve CI and Security on the release pull request (no need)":                                                    {plant("release-please.yml", "    needs: pull-request\n", "    needs: [release]\n"), s},
 		"approve-release-runs.sh does not wait":                                                                                     {plant(approveScript, approveWait, "${APPROVE_WAIT_S:-180}"), s},

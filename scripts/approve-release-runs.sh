@@ -35,6 +35,7 @@ for wf in CI Security; do
   while :; do
     if runs=$(gh api "repos/$GH_REPO/actions/runs?head_sha=$sha&per_page=100" \
       --jq "[.workflow_runs[] | select(.name == \"$wf\" and .event == \"pull_request\") | {id, status, conclusion}]" 2>"$errf"); then
+      last_err="" # a later read answered: the deadline is not that read's
       [[ $(jq length <<<"$runs") -gt 0 ]] && break
     else
       last_err=$(tail -n 1 "$errf")

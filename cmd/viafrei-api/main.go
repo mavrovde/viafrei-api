@@ -126,7 +126,7 @@ func serve(environ []string, stderr io.Writer) int {
 
 	deps := httpapi.Deps{
 		Config:          cfg,
-		Readiness:       health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
+		Readiness:       health.Memoise(health.NewChecker(st, expected, cfg.Health.ReadyTimeout), cfg.Health.ReadyCacheTTL, time.Now),
 		Pressure:        adm,
 		Logger:          log,
 		Build:           buildinfo.Get(),

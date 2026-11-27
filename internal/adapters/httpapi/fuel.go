@@ -106,6 +106,17 @@ type OSMFuelStation struct {
 	SourceFamily string        `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
 
+// osmFuelStations are OpenStreetMap's stations without a price, as the
+// fuel list and the nearby answer state them.
+func osmFuelStations(in []energy.OSMFuelStation) []OSMFuelStation {
+	out := make([]OSMFuelStation, len(in))
+	for i, o := range in {
+		out[i] = OSMFuelStation{Name: o.Name, Brand: o.Brand, Address: PostalAddress{Street: o.Address.Street, Number: o.Address.HouseNumber,
+			Postcode: o.Address.Postcode, Place: o.Address.City}, Location: position(o.Location), DistanceM: tenthKm(o.DistanceM), SourceFamily: o.Family}
+	}
+	return out
+}
+
 // FuelMeta is the meta member of listFuelOptions.
 type FuelMeta struct {
 	DataMeta
@@ -160,13 +171,8 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 		query := FuelQueryMeta{At: position(q.At), RadiusM: q.RadiusM, Sort: q.Sort, Matched: a.Matched,
 			DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown, DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt}
 		fuelCoverage(&query, a.Coverage, data, q.Fuel)
-		osm := make([]OSMFuelStation, len(a.OSMWithoutPrice))
-		for i, o := range a.OSMWithoutPrice {
-			osm[i] = OSMFuelStation{Name: o.Name, Brand: o.Brand, Address: PostalAddress{Street: o.Address.Street, Number: o.Address.HouseNumber,
-				Postcode: o.Address.Postcode, Place: o.Address.City}, Location: position(o.Location), DistanceM: tenthKm(o.DistanceM), SourceFamily: o.Family}
-		}
 		return &FuelOutput{CacheControl: noStore, Body: FuelEnvelope{
-			Data: data, OSMWithoutPrice: osm,
+			Data: data, OSMWithoutPrice: osmFuelStations(a.OSMWithoutPrice),
 			Meta: FuelMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},

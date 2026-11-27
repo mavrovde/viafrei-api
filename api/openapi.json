@@ -27,13 +27,13 @@
         }
       },
       "RateLimit": {
-        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas. An overloaded refusal carries the policy but no RateLimit field: it was refused under load, not by the key's budget.",
         "schema": {
           "type": "string"
         }
       },
       "RateLimit-Policy": {
-        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+        "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas. An overloaded refusal carries the policy but no RateLimit field: it was refused under load, not by the key's budget.",
         "schema": {
           "type": "string"
         }
@@ -5438,6 +5438,13 @@
             "description": "The asked everyday needs, in the order asked.",
             "items": {
               "$ref": "#/components/schemas/NeedBlock"
+            },
+            "type": "array"
+          },
+          "osmFuel": {
+            "description": "With fuel: OpenStreetMap's filling stations (ODbL) in the radius with no station we hold within 300 m, so no price yet, nearest first, three at most, as listFuelOptions' osmWithoutPrice; empty when there are none or the key may not read OpenStreetMap's places. Credited in meta.attribution.",
+            "items": {
+              "$ref": "#/components/schemas/OSMFuelStation"
             },
             "type": "array"
           },
@@ -12350,7 +12357,7 @@
       "name": "ViaFrei API maintainers",
       "url": "https://github.com/mavrovde/viafrei-api/issues"
     },
-    "description": "Keyed, read-only access to live German mobility context. This document is generated from the code.",
+    "description": "Keyed, read-only access to live German mobility context. HEAD mirrors every GET operation without a body, and a 405 names the methods its path serves in Allow. This document is generated from the code.",
     "license": {
       "name": "Terms of use",
       "url": "https://viafrei.de/"

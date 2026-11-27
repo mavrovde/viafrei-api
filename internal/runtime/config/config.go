@@ -128,9 +128,10 @@ type Contract struct {
 
 // Health holds the probe settings.
 type Health struct {
-	ListenAddr   string        `koanf:"listen_addr" default:"localhost:8082" validate:"required,hostname_port" desc:"Address of the health listener, host:port: liveness (/healthz), readiness (/readyz) and the service metadata (/v1/meta), and nothing else. The edge never routes it, so the platform probes the service without being on callers.allow_cidr. Its port differs from server.listen_addr's."`
-	ReadyTimeout time.Duration `koanf:"ready_timeout" default:"500ms" validate:"min=50ms,max=2s" desc:"Time the readiness probe gives storage to answer. At most deadline.request."`
-	ProbeTimeout time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck and meta-check subcommands wait for the health listener."`
+	ListenAddr    string        `koanf:"listen_addr" default:"localhost:8082" validate:"required,hostname_port" desc:"Address of the health listener, host:port: liveness (/healthz), readiness (/readyz) and the service metadata (/v1/meta), and nothing else. The edge never routes it, so the platform probes the service without being on callers.allow_cidr. Its port differs from server.listen_addr's."`
+	ReadyTimeout  time.Duration `koanf:"ready_timeout" default:"500ms" validate:"min=50ms,max=2s" desc:"Time the readiness probe gives storage to answer. At most deadline.request."`
+	ReadyCacheTTL time.Duration `koanf:"ready_cache_ttl" default:"1s" validate:"min=100ms,max=30s" desc:"How long one readiness check answers every readiness call of this instance: readiness is served without a per-address budget, so storage is read for it at most once per this interval, whatever the number of calls."`
+	ProbeTimeout  time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck and meta-check subcommands wait for the health listener."`
 }
 
 // Log holds the logging settings.
@@ -241,7 +242,7 @@ type Compose struct {
 // RateLimit holds the per-address flood control and the rate-limit headers
 // (Spec: Rate Limiting, Quotas and Priority, gates 1 and 2).
 type RateLimit struct {
-	AnonRPS     int           `koanf:"anon_rps" default:"1" validate:"min=0,max=100" desc:"Requests per second one client address may make without presenting a key (service endpoints and keyless requests), as a token bucket (RATE-001, SEC-051). 0 switches the per-address limit off."`
+	AnonRPS     int           `koanf:"anon_rps" default:"1" validate:"min=0,max=100" desc:"Requests per second one client address may make without presenting a valid key, as a token bucket; the service operations are never charged (RATE-001, SEC-051). 0 switches the per-address limit off."`
 	AnonBurst   int           `koanf:"anon_burst" default:"5" validate:"min=1,max=1000" desc:"Burst of the per-address token bucket: requests a client address may make at once before ratelimit.anon_rps applies."`
 	Headers     bool          `koanf:"headers" default:"true" desc:"Send RateLimit-Policy and RateLimit on every keyed answer (RATE-006)."`
 	IPStateTTL  time.Duration `koanf:"ip_state_ttl" default:"10m" validate:"min=1m,max=60m" desc:"How long the state of an idle client address is kept; it is held in memory only and never stored (RATE-015)."`

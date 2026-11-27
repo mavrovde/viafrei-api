@@ -28,7 +28,8 @@ func TestNearbyAnswer(t *testing.T) {
 	f := everyAnswer()
 	ch, pk, st := chargingAnswer(), parkingAnswer(), stationsAnswer()
 	f.nearby = features.NearbyAnswer{
-		Fuel:      &features.FuelStations{Answer: features.Answer[energy.FuelStation]{Items: []energy.FuelStation{{ID: "fu:1", Family: "src-alpha-energy"}}, At: fixedNow}},
+		Fuel: &features.FuelStations{Answer: features.Answer[energy.FuelStation]{Items: []energy.FuelStation{{ID: "fu:1", Family: "src-alpha-energy"}}, At: fixedNow},
+			OSMWithoutPrice: []energy.OSMFuelStation{{Name: "Tank Ost", Location: geo.Point{Lat: 50.95, Lon: 6.97}, DistanceM: 1260, Family: "src-alpha-places"}}},
 		Charging:  &ch,
 		Parking:   &pk,
 		Stations:  &st,
@@ -54,7 +55,9 @@ func TestNearbyAnswer(t *testing.T) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}
 	}
-	for _, want := range []string{`"id":"fu:1"`, `"id":"j:1"`, `"need":"food"`, `"radiusM":3000`, `"kind":"amenity=cafe"`, `"part":"needs"`, `"stations":[`} {
+	// OpenStreetMap's stations without a price come beside the fuel, as
+	// listFuelOptions states them (#241).
+	for _, want := range []string{`"id":"fu:1"`, `"osmFuel":[{"name":"Tank Ost","brand":null,`, `"distanceM":1300,"sourceFamily":"src-alpha-places"}]`, `"id":"j:1"`, `"need":"food"`, `"radiusM":3000`, `"kind":"amenity=cafe"`, `"part":"needs"`, `"stations":[`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}
@@ -63,7 +66,8 @@ func TestNearbyAnswer(t *testing.T) {
 		Parts: []features.PartResult{{Part: "fuel", Status: features.StatusUnavailable, Err: errors.New("down")}, {Part: "junction", Status: features.StatusOK}}}
 	w = do(t, h, http.MethodGet, "/v1/nearby?at=50.94,6.96&radius_m=15000", bearer)
 	if body = w.Body.String(); w.Code != http.StatusOK || !slices.Equal(f.gotNearby.Categories, features.VehicleCategories) ||
-		f.gotNearby.At.RadiusM != 15000 || !strings.Contains(body, `"junctions":[]`) || !strings.Contains(body, "/problems/upstream-unavailable") {
+		f.gotNearby.At.RadiusM != 15000 || !strings.Contains(body, `"junctions":[]`) || !strings.Contains(body, "/problems/upstream-unavailable") ||
+		strings.Contains(body, `"osmFuel"`) {
 		t.Errorf("defaults: %d %s %+v", w.Code, body, f.gotNearby)
 	}
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/nearby?at=50.94,6.96&radius_m=16000", bearer), 400, "invalid-parameter")

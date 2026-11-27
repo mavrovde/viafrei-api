@@ -37,6 +37,7 @@ C	describeLocation	extra	data.governmentRegion	the government region of the posi
 C	describeLocation	extra	data.junction	the nearest junction
 C	listTransitDisruptions	extra	data.alertsCoverage	which Länder the alerts cover and when they were seen
 C	listNearby	extra	data.junctionsFrom	the junctions' source
+C	listNearby	extra	data.osmFuel	OpenStreetMap's unpriced filling stations near the position, as listFuelOptions' osmWithoutPrice and today's nearby search state them; the producer does not project them
 C	listNearby	extra	data.osmParking	the OSM parking near the position
 C	listStopBoards	extra	data.stops[*].location	a stop's position
 # B: the same meaning in another shape.

@@ -232,8 +232,7 @@ prepared and executed with the same arguments), beside the
 | api_road_covering | measured 47 ms p50, 247 ms max (custom plans only) | 56 ms p50, 251 ms max | 5 / 5 | on a par | road pages |
 | api_road_lamp_messages | measured 206 ms p50, 395 ms max (ten roads) | 150 ms p50, 262 ms max | 5 / 5 | no Land lookup | motorway pages |
 | api_road_sources | measured 4.9 ms p50, 11 ms max | 3.4 ms p50, 4.2 ms max | 5 / 5 | the registered families by their key, the data status row of each (read as the owner until the API role's grant, database 0337) | road pages |
-| api_motorway_families | measured 369 ms p50, 446 ms max | 307 ms p50, 459 ms max | 5 / 5 | the register by its key, not the road view's shapes | motorway pages |
-| api_motorways | measured 389 ms p50, 532 ms max | 399 ms p50, 616 ms max | 5 / 5 | on a par: the situations in force grouped by road | motorway pages |
+| api_motorways | measured 389 ms p50, 532 ms max; with the separate families read (api_motorway_families, 198–245 ms) 416–549 ms a list on production, 2026-11-27 | 219–315 ms (three runs, every road), buffers 67k → 31.5k; one road 192 → 150 ms | 5 / 5 | the situations in force are read once: grouped by road, and the families counted on any road of the register from the same read, which replaces api_motorway_families | motorway pages |
 | api_motorways_live_land | measured 643 ms p50, 1104 ms max | 538 ms p50, 708 ms max | 5 / 5 | a road's junction Land by `contract_junction_land`, only for the roads in question | motorway pages |
 | api_road_shapes | 2.4 s (the road list's shape read); measured 481 ms p50, 1.3 s max | 264 ms p50, 445 ms max | no parameters | `autobahn_roads_pkey`, `contract_road_shape` once a road | road pages |
 | api_feeding | measured 4.9–10.8 s (one read of nine views, host loaded) | p50 317 ms, max 546 ms (eight runs; per family: warnings 0.4, lorry 208, events 118, sharing 41, fuel 17, speed cameras 13, alerts 10, zones 0.2) | no parameter: one plan | the dataset's rows reduced to their distinct families first (materialised), then each family's source rule once, not once a row; the warnings' families read one by one along the version key (a scan of 330 000 rows took 1.6 s) | off the request path (the families of each dataset, renewed in the background) |
@@ -280,3 +279,31 @@ answers the same row.
 - The drop of the real-time departures' coalesce index is coordinated: no API statement needs it.
 - The DB station register's EVA number has no index (8 800 rows, a scan of about 1 ms; not
   needed now).
+
+## Station text search: the ties of one name (#229 B)
+
+With a text and no position every key's distance is null, so the key
+CTE's cut (`rank()` over distance and name) keeps the whole group of one
+exact name at the limit, and the page reads the full row and the planned
+calls of each key in it before it cuts at the limit. The group is counted
+after the collapse of platforms into their station (ownStation), which
+runs before the cut.
+
+The largest groups of one name among the stops a station search reads
+(prod, 2026-11-27, before the collapse): Bonn Hbf 48, Wiesdorf Leverkusen
+Mitte Bf 37, Köln Wahn S-Bahn 36, Köln Chorweiler 36, Regensburg Hbf 35.
+The prepared statement on its generic plan (22 generic, 5 custom), limit
+1 and 10 (the statement is asked one more):
+
+| Text | limit 1 | limit 10 |
+|-|-|-|
+| Bonn Hbf | 27.4 ms | 34.6 ms |
+| Wiesdorf Leverkusen Mitte Bf | 19.4 ms | 42.6 ms |
+| Köln Wahn S-Bahn | 21.6 ms | 24.0 ms |
+| Köln Chorweiler | 20.4 ms | 21.2 ms |
+| Regensburg Hbf | 61.5 ms | 71.6 ms |
+
+After the collapse each group is one or two stops, so the read stays far
+under the 2 s deadline and needs no bound. Before the change (generic,
+2026-11-26) Leipzig, Hauptbahnhof (Tram/Bus) took 25.5 ms and now 26.0
+ms; strasse 75.2 ms and now 50.6 ms.

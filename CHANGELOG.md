@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.4](https://github.com/mavrovde/viafrei-api/compare/v2.0.3...v2.0.4) (2026-11-27)
+
+
+### Fixed
+
+* release 2.0.4 - station and place search order, nearby OSM fuel, motorway list read once, HEAD/Allow/empty values, service operations and keyed limits ([#288](https://github.com/mavrovde/viafrei-api/issues/288)) ([e896981](https://github.com/mavrovde/viafrei-api/commit/e89698146bba8e6f32bc4709c78c60ea99c06b5e))
+
 ## [2.0.3](https://github.com/mavrovde/viafrei-api/compare/v2.0.2...v2.0.3) (2026-11-26)
 
 

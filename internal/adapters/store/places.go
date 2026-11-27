@@ -52,7 +52,7 @@ found as (
   `+stopRows("case when contract_search_fold(s.name) = any((select $2::text) || (select $11::text[])) then 0 else 1 end",
 	foldStarts("contract_search_fold(s.name)"))+`
   union all
-  select r.road, r.road, 'motorway', pt.location, null, false, 'autobahn', 0, null, null, null
+  select r.road, r.road, 'motorway', pt.location, null, false, 'autobahn', 0, null, null, null, null, null
   from autobahn_roads r
   cross join lateral (
     select coalesce((select t.geom::geometry(Point,4326) from tmc_locations t
@@ -83,11 +83,15 @@ select f.id, f.name, f.kind, st_y(f.location), st_x(f.location),
             when f.region_key is not null then (select a.ags from ags_regions a
               where a.ags = any(array[left(f.region_key, 5), left(f.region_key, 2)]) order by length(a.ags) desc limit 1) end,
        f.source_ref, f.dist, f.official_key,
-       case when btrim(f.name_en) <> '' and f.name_en <> f.name then f.name_en end
+       case when btrim(f.name_en) <> '' and f.name_en <> f.name then f.name_en end,
+       f.part_of,
+       (select min(m.name) from gazetteer_places m
+         where f.part_of is not null and m.admin_code = f.part_of and m.kind = 'city' and m.closed_at is null and m.source_id = '`+places.KreisFamily+`' and m.source_id = any($1::text[])),
+       case when f.population > 0 then f.population end
 from (
-  select id, name, kind, location, region_key, stop, source_ref, rank, prominence, official_key, name_en, dist from first
+  select id, name, kind, location, region_key, stop, source_ref, rank, prominence, official_key, name_en, part_of, population, dist from first
   union all
-  select id, name, kind, location, region_key, stop, source_ref, rank, prominence, official_key, name_en, dist from rest
+  select id, name, kind, location, region_key, stop, source_ref, rank, prominence, official_key, name_en, part_of, population, dist from rest
   order by rank, prominence desc nulls last, dist nulls last, name, id
   limit (select $7::int)) f
 order by f.rank, f.prominence desc nulls last, f.dist nulls last, f.name, f.id`,
@@ -129,11 +133,14 @@ const placesShort = `(select count(*) from first) < (select $7::int)`
 // columns of the place search's candidates.
 func placeRows(h string) string {
 	return `select g.id::text id, g.name,
-         case g.kind when 'city' then 'municipality' when 'district' then 'district' when 'admin' then 'state'
+         case g.kind when 'city' then case when g.part_type is not null then 'locality' else 'municipality' end
+                     when 'district' then 'district' when 'admin' then 'state'
                      when 'station' then 'station_area' when 'stop' then 'station_area' when 'island' then 'locality'
                      when 'motorway' then 'motorway' when 'junction' then 'junction' else 'other' end kind,
-         st_pointonsurface(g.geom::geometry)::geometry(Point,4326) location, g.admin_code region_key, false stop,
-         g.source_id source_ref, h.rank, coalesce(g.rank, 0) prominence, g.admin_code official_key, g.name_en
+         st_pointonsurface(g.geom::geometry)::geometry(Point,4326) location, coalesce(g.admin_code, g.part_of) region_key, false stop,
+         g.source_id source_ref, case when g.part_type is not null then greatest(h.rank, 1) else h.rank end rank,
+         case when g.part_type is not null then -1 else coalesce(g.rank, 0) end prominence, g.admin_code official_key, g.name_en,
+         case when g.part_type is not null then g.part_of end part_of, g.population
   from ` + h + ` h
   join gazetteer_places g on g.id = h.id`
 }
@@ -146,7 +153,7 @@ func placeRows(h string) string {
 // of its platforms, 100 m apart, as three places).
 func stopRows(rank, match string) string {
 	return `select s.gtfs_feed_key::text || ':' || s.id, s.name, 'station_area', s.geom::geometry(Point,4326), split_part(s.id, ':', 2), true,
-         f.source_feed, ` + rank + `, null, null, null
+         f.source_feed, ` + rank + `, null, null, null, null, null
   from stops s
   join feeds f on f.gtfs_feed_key = s.gtfs_feed_key
   where ` + match + `
@@ -160,6 +167,7 @@ func stopRows(rank, match string) string {
 // radius $6 of the position, in the search's order, while gate holds.
 func placesPicked(c, gate string) string {
 	return `select f.id, f.name, f.kind, f.location, f.region_key, f.stop, f.source_ref, f.rank, f.prominence, f.official_key, f.name_en,
+         f.part_of, f.population,
          case when here.g is null then null else round(st_distance(f.location::geography, here.g, false))::int end dist
   from ` + c + ` f
   cross join here
@@ -194,7 +202,8 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 				v    places.Place
 				kind string
 			)
-			err := r.Scan(&v.ID, &v.Name, &kind, &v.Location.Lat, &v.Location.Lon, &v.RegionCode, &v.Family, &v.DistanceM, &v.OfficialKey, &v.NameEn)
+			err := r.Scan(&v.ID, &v.Name, &kind, &v.Location.Lat, &v.Location.Lon, &v.RegionCode, &v.Family, &v.DistanceM, &v.OfficialKey, &v.NameEn,
+				&v.PartOfKey, &v.PartOf, &v.Population)
 			v.Kind = places.MapKind(kind)
 			return v, err
 		})
@@ -217,7 +226,7 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 func nameKreise(ctx context.Context, tx pgx.Tx, ps []places.Place, families []string) error {
 	var keys []string
 	for _, p := range ps {
-		if k := places.KreisKey(p.Kind, p.OfficialKey); k != nil && !slices.Contains(keys, *k) {
+		if k := places.KreisKey(p.Kind, p.GemeindeKey()); k != nil && !slices.Contains(keys, *k) {
 			keys = append(keys, *k)
 		}
 	}
@@ -230,8 +239,8 @@ func nameKreise(ctx context.Context, tx pgx.Tx, ps []places.Place, families []st
 		}
 	}
 	for i := range ps {
-		ps[i].Kreis = places.KreisOf(ps[i].Kind, ps[i].OfficialKey, names)
-		if k := places.KreisKey(ps[i].Kind, ps[i].OfficialKey); k != nil && ps[i].Kreis != nil {
+		ps[i].Kreis = places.KreisOf(ps[i].Kind, ps[i].GemeindeKey(), names)
+		if k := places.KreisKey(ps[i].Kind, ps[i].GemeindeKey()); k != nil && ps[i].Kreis != nil {
 			ps[i].KreisFamily = places.KreisFamily
 		}
 	}

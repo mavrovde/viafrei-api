@@ -44,6 +44,8 @@ jobs:
         run: bash scripts/load-previous.test.sh
       - name: Self-test of the fuzz job matrix (TST-016)
         run: bash scripts/fuzz.test.sh
+      - name: Self-test of the release notes' API section
+        run: bash scripts/release-api-notes.test.sh
 
   test:
     name: Unit and handler tests

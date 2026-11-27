@@ -100,7 +100,7 @@ type PoiOutput struct {
 
 func registerPois(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Places of interest by name"
-	op.Description = "The places of interest OpenStreetMap maps whose name or brand holds the text: in a town, around a position, or anywhere; the name spelt as asked first, then one that begins with it, then the nearest. Pages of up to 25, at most 50 in all. Needs the scope places."
+	op.Description = "The places of interest OpenStreetMap maps whose name or brand holds the text: in a town, around a position, or anywhere; around a position the nearest first, else the name spelt as asked first, then one that begins with it. Pages of up to 25, at most 50 in all. Needs the scope places."
 	featureResponses(api, &op, "Not used by this operation.")
 	op.Extensions[counterpartExtension] = "place of interest search"
 	huma.Register(api, op, func(ctx context.Context, in *PoiInput) (*PoiOutput, error) {

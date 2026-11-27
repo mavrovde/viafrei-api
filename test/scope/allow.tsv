@@ -189,3 +189,6 @@ vocabulary	internal/adapters/store/freshness_osm_integration_test.go	ingest	owne
 denylist	internal/adapters/store/legacy_b7_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/roadshape_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/place_candidates_plan_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/lamp_in_force_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them seeds those tables
+denylist	internal/adapters/store/places_parts_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them seeds those tables
+denylist	internal/adapters/store/poi_order_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them seeds those tables

@@ -45,6 +45,8 @@ type PlaceItem struct {
 	NameEn       *string `json:"nameEn,omitempty" doc:"The place's English name where it differs from name (Munich for München), as the platform's place search states it. Absent else."`
 	Kreis        *string `json:"kreis,omitempty" doc:"The Kreis the place lies in, in German, as the platform's place search states it: kreisfreie Stadt for a town that is one, else Kreis and the district's name (kreisfreie Stadt and the name for a place in one; the name alone when it says Kreis or Region itself). Absent when none can be named, as for a district, a Land, a city-state and a stop."`
 	AGS          *string `json:"ags,omitempty" doc:"The place's own official key when it is an AGS (Amtlicher Gemeindeschlüssel): a Gemeinde's eight digits, a district's five, a Land's two. Absent when the place has none, as a stop and a motorway have none."`
+	PartOf       *string `json:"partOf,omitempty" doc:"For a city district (kind locality), the municipality it is part of; its Land and Kreis are that municipality's (districtCode, kreis). Absent for any other place."`
+	Population   *int    `json:"population,omitempty" doc:"The place's population where the gazetteer holds one. Absent else, as for a stop, a junction and a motorway."`
 }
 
 // PlacesQuery is meta.query of listPlaces.
@@ -109,6 +111,7 @@ func registerPlaces(api huma.API, s *server, op huma.Operation) {
 			data[i] = PlaceItem{
 				PlaceSummary: PlaceSummary{ID: p.ID, Name: p.Name, Kind: string(p.Kind), Location: position(p.Location), SourceFamily: p.Family},
 				DistrictCode: p.RegionCode, DistanceM: p.DistanceM, AGS: p.AGS(), NameEn: p.NameEn, Kreis: p.Kreis,
+				PartOf: p.PartOf, Population: p.Population,
 			}
 		}
 		return &PlacesOutput{CacheControl: noStore, Body: PlacesEnvelope{

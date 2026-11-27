@@ -28,10 +28,18 @@ hit as (
   where (a.search_fold like '%' || $2 || '%' or a.search_fold like any(array(select '%' || x || '%' from unnest($11::text[]) x))) and ` + permitted("a") + `
   group by a.place_id),
 found as (
-  select p.place_id id, p.name, p.place_kind kind, p.location, p.region_code, p.source_ref, hit.rank, p.prominence, p.official_key,
-         true aliased
+  -- carried on purpose (#307): a gazetteer city that is part of a
+  -- municipality is a locality of it, its Land the municipality's, ranked
+  -- after a municipality spelt alike; the view has no part_of
+  select p.place_id id, p.name, case when gp.part_type is not null then 'locality' else p.place_kind end kind, p.location,
+         coalesce(p.region_code, (select a.ags from ags_regions a where a.ags = any(array[left(gp.part_of, 5), left(gp.part_of, 2)])
+                                   order by length(a.ags) desc limit 1)) region_code,
+         p.source_ref, case when gp.part_type is not null then greatest(hit.rank, 1) else hit.rank end rank,
+         case when gp.part_type is not null then -1 else p.prominence end prominence, p.official_key,
+         true aliased, case when gp.part_type is not null then gp.part_of end part_of, gp.population
   from contract.place p
   join hit on hit.place_id = p.place_id
+  left join public.gazetteer_places gp on gp.id::text = p.place_id and gp.kind = 'city'
   where p.withdrawn_at is null
     and p.location is not null
     and (p.source_ref = any($1) or (p.place_kind = 'junction' and p.source_ref = any($9))
@@ -43,7 +51,7 @@ found as (
   union all
   select s.stop_place_id, s.name, 'station_area', s.location, s.region_code, s.source_ref,
          case when s.search_fold = any(array[$2::text] || $11::text[]) then 0
-              when s.search_fold like $2 || '%' or s.search_fold like any(array(select x || '%' from unnest($11::text[]) x)) then 1 else 2 end, null, null, false
+              when s.search_fold like $2 || '%' or s.search_fold like any(array(select x || '%' from unnest($11::text[]) x)) then 1 else 2 end, null, null, false, null, null
   from contract.stop_place s
   where (s.search_fold like '%' || $2 || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($11::text[]) x)))
     and s.withdrawn_at is null
@@ -59,7 +67,7 @@ found as (
                 or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
                     and r.stop_place_id ~<~ s.stop_place_id)))
   union all
-  select r.road_ref, r.road_ref, 'motorway', pt.location, null, r.source_ref, 0, null, null, false
+  select r.road_ref, r.road_ref, 'motorway', pt.location, null, r.source_ref, 0, null, null, false, null, null
   from contract.road r
   cross join lateral (
     select coalesce((select j.location from contract.junction j
@@ -73,7 +81,12 @@ found as (
     and ` + permitted("r") + `)
 select f.id, f.name, f.kind, st_y(f.location), st_x(f.location), f.region_code, f.source_ref, f.dist, f.official_key,
        case when f.aliased then (select min(e.label) from contract.place_alias e
-         where e.place_id = f.id and e.lang = 'en' and btrim(e.label) <> '' and e.label <> f.name and ` + permitted("e") + `) end
+         where e.place_id = f.id and e.lang = 'en' and btrim(e.label) <> '' and e.label <> f.name and ` + permitted("e") + `) end,
+       f.part_of,
+       (select min(m.name) from contract.place m
+         where f.part_of is not null and m.official_key = f.part_of and m.place_kind = 'municipality' and m.withdrawn_at is null
+           and m.source_ref = '` + places.KreisFamily + `' and m.source_ref = any($1::text[]) and ` + permitted("m") + `),
+       case when f.population > 0 then f.population end
 from (
   select f.*, case when here.g is null then null else round(st_distance(f.location::geography, here.g, false))::int end dist
   from found f

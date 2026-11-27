@@ -7470,6 +7470,15 @@
             "description": "The place's English name where it differs from name (Munich for München), as the platform's place search states it. Absent else.",
             "type": "string"
           },
+          "partOf": {
+            "description": "For a city district (kind locality), the municipality it is part of; its Land and Kreis are that municipality's (districtCode, kreis). Absent for any other place.",
+            "type": "string"
+          },
+          "population": {
+            "description": "The place's population where the gazetteer holds one. Absent else, as for a stop, a junction and a motorway.",
+            "format": "int64",
+            "type": "integer"
+          },
           "sourceFamily": {
             "type": "string"
           }

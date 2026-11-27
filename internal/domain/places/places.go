@@ -58,6 +58,23 @@ type Place struct {
 	// DistanceM is the distance from the asked position; nil without one.
 	DistanceM *int
 	Family    string
+	// PartOfKey is the Gemeinde key of the municipality a city district
+	// (kind locality) is part of, and PartOf that municipality's name; nil
+	// for any other place or when not recorded.
+	PartOfKey *string
+	PartOf    *string
+	// Population is the place's population where the gazetteer holds one
+	// above zero; nil else.
+	Population *int
+}
+
+// GemeindeKey is the key the place's Kreis is named from: its own official
+// key, else the key of the municipality it is part of.
+func (p Place) GemeindeKey() *string {
+	if p.OfficialKey != nil {
+		return p.OfficialKey
+	}
+	return p.PartOfKey
 }
 
 // agsForm is the form of an official key that is an AGS, as the platform

@@ -354,3 +354,28 @@ share ("essen", "wurzburg") still rechecks thousands of candidates on the
 heap, which the trigram GIN cannot narrow further.
 `TestPlaceCandidatesPlan` holds the plan's shape (no read of a whole index,
 each fold by its name, nothing read for a repeated spelling).
+
+## Motorway conditions: the plan sources' texts (#290)
+
+`api_road_shapes`, which the issue named, is not read on a request: it is
+the road shapes' snapshot, renewed off the request every five minutes, and
+its plans equal its calls (865 / 854, 0.3 ms each) because each renewal
+lands on a connection that has not prepared it yet. A conditions answer
+(prod, 2026-11-27, A3 861 ms, storage 850 ms) runs about ten statements in
+turn, none above 270 ms; the largest are the sweep counts and events and the
+plan sources' entries (`api_road_status_planned`).
+
+The plan sources' entries derive their answer texts with eight JSON paths
+over each entry's payload, a DATEX II publication of up to 4.5 MB as text
+(37 kB stored, compressed): each path decompressed the stored value again.
+Dropping the paths took A3 from 324 to 39 ms. The payload is now
+decompressed once per entry, in a lateral kept apart by `offset 0`
+(`#> '{}'` is the whole value). A3, the same transaction, six runs each,
+alternating: 319-568 ms (median 360) before, 170-385 ms (median 210) after.
+Rows: A1-A10, A40, A99, B9 at limit 1 and 20, the same before and after.
+`TestRoadStatusPlannedPayloadOnce` holds it (no path reads the stored
+column; one node computes the decompressed value).
+
+What stays is the paths' own walk of the large publications (the
+recursive `.**` paths); the texts could be stored at write time, as the
+entry facts are, which is a schema change.

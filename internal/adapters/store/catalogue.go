@@ -119,6 +119,8 @@ func collectMotorways(res pgx.Rows, shapes map[string]roadShape) ([]roads.Motorw
 // families of the situations in force on any road of the register, whatever
 // the query keeps, from the same read of the situations: one row with no
 // road carries them when no road is kept.
+//
+//nolint:misspell // materialized is the SQL keyword
 func motorwaysOf(name string, liveLand bool) stmt {
 	inLand := ``
 	if liveLand {

@@ -19,9 +19,10 @@ import (
 
 // TrainBoardInput is the input of getTrainBoard.
 type TrainBoardInput struct {
-	EVA         string `path:"eva" pattern:"^[0-9]{7}$" example:"8000105" doc:"The station's EVA number."`
-	Limit       int    `query:"limit" minimum:"1" maximum:"50" default:"5" doc:"How many departures to show, the next to leave first (1 to 50)."`
-	DurationMin int    `query:"duration_min" minimum:"5" maximum:"120" default:"60" doc:"How far ahead to look, in minutes (5 to 120)."`
+	EVA         string   `path:"eva" pattern:"^[0-9]{7}$" example:"8000105" doc:"The station's EVA number."`
+	Limit       int      `query:"limit" minimum:"1" maximum:"50" default:"5" doc:"How many departures to show, the next to leave first (1 to 50)."`
+	DurationMin int      `query:"duration_min" minimum:"5" maximum:"120" default:"60" doc:"How far ahead to look, in minutes (5 to 120)."`
+	Categories  []string `query:"categories" maxItems:"20" doc:"Keep only trains of these categories (comma-separated, as the board writes them: ICE, IC, RE, RB, S), before the limit is applied. Default: every departure."`
 }
 
 // TrainBoardDeparture is one departure of a served board, as the MCP
@@ -112,7 +113,7 @@ func registerTrainBoard(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		a, err := s.features.TrainBoard(ctx, principalFrom(ctx).Key, features.TrainBoardQuery{EVA: in.EVA, Limit: in.Limit, DurationMin: in.DurationMin})
+		a, err := s.features.TrainBoard(ctx, principalFrom(ctx).Key, features.TrainBoardQuery{EVA: in.EVA, Limit: in.Limit, DurationMin: in.DurationMin, Categories: in.Categories})
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}

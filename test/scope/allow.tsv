@@ -15,7 +15,6 @@ column	api/openapi.json	delayMin	member name of the road situation fixed by Spec
 column	api/openapi.json	road_class	query parameter of the conditions in an area fixed by Spec: Endpoints, Roads, section 5 (FR-ROAD-006); the resource vocabulary, not a storage name
 column	api/openapi.json	legalBasis	member name of a driving rule fixed by Spec: Endpoints, Weather, Rules and Composed, section 2 (rules[].legalBasis); the resource vocabulary, not a storage name
 column	api/openapi.json	reviewedOn	member name of a rule topic fixed by Spec: Endpoints, Weather, Rules and Composed, section 2 and FR-RULES-001; the resource vocabulary, not a storage name
-vocabulary	test/inventory/mcp.tsv	feeds	the MCP server's own resource URI, exactly as its release lists it (internal/release/inventory); a record of what a consumer asks for, not the API's vocabulary
 vocabulary	internal/fixtures/generate.go	datex	the id the read contract itself gives a Land or city traffic message, written as the view writes it so the fixture plants what the platform holds; an opaque id is asked of the database lane
 column	api/openapi.json	stationId	path parameter of the departure board, the station id listStations answers (FR-TRANSIT-002); the resource vocabulary, not a storage name
 column	api/openapi.json	journeyId	member name of a departure, the trip and its service day as the departure board names it (FR-TRANSIT-002); the resource vocabulary, not a storage name
@@ -39,7 +38,6 @@ vocabulary	test/parity/bundles/2.6.54.json	datex	a situation id exactly as the r
 column	api/openapi.json	providerUpdatedAt	the public member of a hydrogen station published before the read contract named its column; the contract took the public name, it exposes no storage
 column	api/openapi.json	reportedAt	the public member of a report published before the read contract named a sharing column the same; the contract took the public name, it exposes no storage
 column	api/openapi.json	whole_day	the platform tool argument find_fuel_station.whole_day, named as the tool names it for parity (FR-ENERGY-002); a request parameter, not a storage name
-vocabulary	test/inventory/mapping.tsv	feeds	the MCP server's own resource URI as the inventory names it (mcp.tsv); a record of what a consumer asks for, not the API's vocabulary
 column	api/openapi.json	fetchedAt	member name of a train board, when the board was fetched (getTrainBoard, T2); the resource vocabulary, not a storage name
 column	api/openapi.json	houseNumber	member name of an on-street bay's address, as listAddresses names an address part (listParkingBays, G4); the resource vocabulary, not a storage name
 column	api/openapi.json	publisherKind	member name of an on-street bay, the publisher's own word for it (listParkingBays, G4); the resource vocabulary, not a storage name

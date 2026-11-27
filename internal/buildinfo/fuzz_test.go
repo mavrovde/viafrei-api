@@ -6,8 +6,8 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 )
 
-// FuzzParsePlatform (TEST-006, TST-016): platform-version.txt is written by
-// the version sync. Any content either parses or is refused, never a crash;
+// FuzzParsePlatform (TEST-006, TST-016): platform-version.txt keeps its last
+// synced value; no tool writes it. Any content either parses or is refused, never a crash;
 // what parses is unsynced ("") or a version that parses back to itself
 // (round trip), with no surrounding space.
 // Seed corpus: testdata/fuzz/FuzzParsePlatform (test/fuzz/targets.tsv).

@@ -1,20 +1,13 @@
-// Command inventory exports what the API must serve, from its two
-// consumers' releases, into the pinned files of test/inventory, and checks
-// that those files are as new as the releases (the release guard).
+// Command inventory exports what the site asks the API for, from the site's
+// releases, into the pinned files of test/inventory, and checks that those
+// files are as new as the site's newest release (the release guard). The API
+// checks only what comes before it (the database it pins); the MCP server is
+// a consumer that checks the API, so nothing here reads the MCP server or the
+// npm package viafrei.
 //
-//	go run ./internal/release/inventory mcp -version X.Y.Z -commit SHA -catalogue catalogue.json
 //	go run ./internal/release/inventory routes -version X.Y.Z -commit SHA FILE...
 //	go run ./internal/release/inventory web -version X.Y.Z -commit SHA [-expand TEMPLATE=a,b,...]... DIR
-//	go run ./internal/release/inventory age -dir test/inventory -platform X.Y.Z -web X.Y.Z
-//
-// mcp reads the MCP server's catalogue, server/catalogue/catalogue.json of
-// mavrovde/viafrei-mcp at the tag vX.Y.Z of the release the npm package
-// viafrei publishes (its tools with their input schemas, its resources), and
-// writes one row per tool, per argument and per resource. A tool's row
-// carries the sha256 of its input schema, compacted as the catalogue holds
-// it; its arguments are the schema's properties in their order, language
-// left out (every tool takes it; it picks the answer's language, not data).
-// Prompts are left out: they hold no data, they compose the tools.
+//	go run ./internal/release/inventory age -dir test/inventory -web X.Y.Z
 //
 // routes reads the source files of the platform's fragment service and
 // writes one row per route it registers (method and path, its constants
@@ -31,19 +24,14 @@
 //
 // Every file starts with `# source <consumer> <version> <commit>`. age
 // refuses (exit 1) when a file's version is older than the newest release of
-// its consumer: export again first. -platform is the MCP server's release
-// (the npm dist-tag latest of viafrei, as platformsync reads it); a frozen
-// file is named as skipped, with its reason, and never compared.
+// its consumer: export again first. A frozen file is named as skipped, with
+// its reason, and never compared.
 //
 // Exit 0 on success; 1 on a refusal; 2 on a usage error or an input that
 // cannot be read (never a pass).
 package main
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -52,7 +40,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -67,10 +54,10 @@ var errRefused = errors.New("refused")
 
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "inventory: mcp, routes, web or age")
+		fmt.Fprintln(stderr, "inventory: routes, web or age")
 		return 2
 	}
-	cmds := map[string]func([]string, io.Writer, io.Writer) error{"mcp": mcpCmd, "routes": routesCmd, "web": webCmd, "age": ageCmd}
+	cmds := map[string]func([]string, io.Writer, io.Writer) error{"routes": routesCmd, "web": webCmd, "age": ageCmd}
 	cmd, ok := cmds[args[0]]
 	if !ok {
 		fmt.Fprintf(stderr, "inventory: unknown command %q\n", args[0])
@@ -100,107 +87,6 @@ func source(fs *flag.FlagSet, consumer string, args []string, stderr io.Writer) 
 		return "", fmt.Errorf("%s needs -version X.Y.Z and -commit SHA", consumer)
 	}
 	return "# source " + consumer + " " + *version + " " + *commit, nil
-}
-
-func mcpCmd(args []string, stdout, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
-	catalogue := fs.String("catalogue", "", "the MCP server's server/catalogue/catalogue.json at the release's tag (tools with their input schemas, resources)")
-	head, err := source(fs, "mcp", args, stderr)
-	if err != nil {
-		return err
-	}
-	var cat struct {
-		Tools []struct {
-			Name        string          `json:"name"`
-			InputSchema json.RawMessage `json:"inputSchema"`
-		} `json:"tools"`
-		Resources []struct {
-			URI string `json:"uri"`
-		} `json:"resources"`
-	}
-	if err := readJSON(*catalogue, &cat); err != nil {
-		return err
-	}
-	if len(cat.Tools) == 0 || len(cat.Resources) == 0 {
-		return errors.New("the catalogue lists no tool or no resource")
-	}
-	rows := []string{head, "# kind\tentry\tdetail"}
-	for _, t := range cat.Tools {
-		argRows, err := schemaArgs(t.InputSchema)
-		if err != nil {
-			return fmt.Errorf("tool %s: %w", t.Name, err)
-		}
-		var compact bytes.Buffer
-		_ = json.Compact(&compact, t.InputSchema) // schemaArgs has read it: valid JSON
-		sum := sha256.Sum256(compact.Bytes())
-		rows = append(rows, "tool\t"+t.Name+"\tschema sha256:"+hex.EncodeToString(sum[:]))
-		for _, a := range argRows {
-			rows = append(rows, "argument\t"+t.Name+"."+a)
-		}
-	}
-	for _, r := range cat.Resources {
-		rows = append(rows, "resource\t"+r.URI+"\t-")
-	}
-	_, err = io.WriteString(stdout, strings.Join(rows, "\n")+"\n")
-	return err
-}
-
-// schemaArgs returns a tool's arguments as its input schema declares them,
-// in the schema's order, each as "<name>\t<type> required|optional" (an
-// array is <item type>[]), language left out.
-func schemaArgs(schema json.RawMessage) ([]string, error) {
-	var s struct {
-		Properties json.RawMessage `json:"properties"`
-		Required   []string        `json:"required"`
-	}
-	if err := json.Unmarshal(schema, &s); err != nil {
-		return nil, fmt.Errorf("input schema: %w", err)
-	}
-	dec := json.NewDecoder(bytes.NewReader(s.Properties))
-	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
-		return nil, errors.New("the input schema has no properties object")
-	}
-	var out []string
-	for dec.More() {
-		k, _ := dec.Token() // a key: the object is valid JSON
-		name, _ := k.(string)
-		var p struct {
-			Type  string `json:"type"`
-			Items struct {
-				Type string `json:"type"`
-			} `json:"items"`
-		}
-		if err := dec.Decode(&p); err != nil {
-			return nil, fmt.Errorf("argument %s: %w", name, err)
-		}
-		typ := p.Type
-		if typ == "array" {
-			typ = p.Items.Type + "[]"
-		}
-		if typ == "" || typ == "[]" {
-			return nil, fmt.Errorf("argument %s names no type", name)
-		}
-		if name == "language" {
-			continue
-		}
-		req := "optional"
-		if slices.Contains(s.Required, name) {
-			req = "required"
-		}
-		out = append(out, name+"\t"+typ+" "+req)
-	}
-	return out, nil
-}
-
-func readJSON(path string, v any) error {
-	b, err := os.ReadFile(path) // #nosec G304 -- a file the maintainer names
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(b, v); err != nil {
-		return fmt.Errorf("%s: %w", path, err)
-	}
-	return nil
 }
 
 var (
@@ -433,9 +319,9 @@ func webCmd(args []string, stdout, stderr io.Writer) error {
 	return err
 }
 
-// Inventory files and the consumer whose release each records: platform is
-// the MCP server's release (-platform), web the site's (-web).
-var Files = map[string]string{"mcp.tsv": "platform", "routes.tsv": "frozen", "web.tsv": "web"}
+// Inventory files and the consumer whose release each records: web is the
+// site's release (-web).
+var Files = map[string]string{"routes.tsv": "frozen", "web.tsv": "web"}
 
 // Frozen names the files of retired consumers, which age reads (the header
 // must hold) and names as skipped with the reason, and never compares with a
@@ -472,8 +358,7 @@ func ageCmd(args []string, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	dir := fs.String("dir", "test/inventory", "the inventory directory")
 	newest := map[string]*string{
-		"platform": fs.String("platform", "", "the platform's newest release X.Y.Z"),
-		"web":      fs.String("web", "", "the site's newest release X.Y.Z"),
+		"web": fs.String("web", "", "the site's newest release X.Y.Z"),
 	}
 	if err := fs.Parse(args); err != nil {
 		return err

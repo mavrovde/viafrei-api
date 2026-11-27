@@ -129,7 +129,8 @@ var (
 	// sources' publications: up to 4.5 MB as text, 37 kB stored): the
 	// payload is decompressed once per entry (dp, kept apart by offset 0;
 	// #> '{}' is the whole value), where each of the eight paths over it
-	// decompressed it again (#290: A3 324 -> 160 ms on prod).
+	// decompressed it again (#290: A3 on prod, six alternating runs, median
+	// 360 -> 210 ms).
 	roadStatusPlanned = named("api_road_status_planned", `
   with m0 as (
     select e.id, e.feed_key, e.road_number, e.event_type, e.publisher,

@@ -19,7 +19,7 @@ import (
 // TestRoadStatusPlannedPayloadOnce: the plan sources' read derives its
 // answer rows' texts from each entry's payload decompressed once, never
 // from the stored column in each path (a plan entry's payload is up to 4.5 MB
-// as text; eight paths decompressed it eight times, #290: A3 324 ms on prod).
+// as text; eight paths decompressed it eight times, #290: A3 median 360 ms on prod).
 // The decompressed value is a column of its own (the lateral kept apart by
 // offset 0), never an expression the planner copies into each path.
 func TestRoadStatusPlannedPayloadOnce(t *testing.T) {

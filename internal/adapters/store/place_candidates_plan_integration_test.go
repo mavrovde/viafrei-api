@@ -5,6 +5,7 @@ package store_test
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -22,8 +23,8 @@ import (
 // table joined to the patterns), reads each fold's rows by its name (never
 // every fold beside every row: 214 000 rows filtered for "bamberg") and
 // filters no joined row, and reads nothing for the expanded spelling when it
-// is the folded one (#291: 617 ms for "bamberg" on prod, the trigram
-// candidates of one spelling rechecked twice).
+// is the folded one (#291: "bamberg" 455 ms custom, 689 ms generic on
+// prod, the trigram candidates of one spelling rechecked twice).
 func TestPlaceCandidatesPlan(t *testing.T) {
 	req.Covers(t, "NFR-PERF-001")
 	var sql string
@@ -76,20 +77,26 @@ order by name_norm limit 1`, &fold)
 	}
 }
 
+// trigramFilter is a filter of one trigram match of the folded or the
+// English name against a spelling, and nothing else.
+var trigramFilter = regexp.MustCompile(`^\((?:\(name_en IS NOT NULL\) AND \()?(?:name_norm|lower\(name_en\)) % \$[12]\)\)?$`)
+
 // candidatePlanFaults are the nodes of an analysed plan that break
 // TestPlaceCandidatesPlan's rules.
 func candidatePlanFaults(plan any) []string {
 	var out []string
 	byFold := false
-	// parentFilter is the filter of the node above: a trigram arm, which
-	// prod's statistics serve from the trigram index, may read the whole
-	// index on the fixture's few rows, and is not a read this test judges.
-	var walk func(n any, parentFilter string)
-	walk = func(n any, parentFilter string) {
+	// trigramArm is set for the children of a bitmap heap scan whose filter
+	// is one trigram match and nothing else: prod's statistics serve that arm
+	// from its trigram index, while the fixture's generic plan, priced on a
+	// few rows, may serve the filter from a whole partial btree. Only that
+	// bitmap source is not judged; every other read is.
+	var walk func(n any, trigramArm bool)
+	walk = func(n any, trigramArm bool) {
 		switch v := n.(type) {
 		case []any:
 			for _, e := range v {
-				walk(e, parentFilter)
+				walk(e, trigramArm)
 			}
 		case map[string]any:
 			ran, _ := v["Actual Loops"].(float64)
@@ -99,8 +106,8 @@ func candidatePlanFaults(plan any) []string {
 			// read with no condition is a read of all of it.
 			c, cond := v["Index Cond"].(string)
 			byFold = byFold || ran > 0 && strings.Contains(c, "= f.name_norm")
-			if ran > 0 && !strings.Contains(parentFilter, " % ") && (kind == "Seq Scan" && v["Relation Name"] == "gazetteer_places" ||
-				(kind == "Index Scan" || kind == "Index Only Scan" || kind == "Bitmap Index Scan") && !cond) {
+			if ran > 0 && (kind == "Seq Scan" && v["Relation Name"] == "gazetteer_places" ||
+				(kind == "Index Scan" || kind == "Index Only Scan" || kind == "Bitmap Index Scan" && !trigramArm) && !cond) {
 				out = append(out, fmt.Sprintf("%s of %v with no index condition", kind, v["Index Name"]))
 			}
 			if removed, _ := v["Rows Removed by Join Filter"].(float64); removed > 0 {
@@ -111,12 +118,13 @@ func candidatePlanFaults(plan any) []string {
 					out = append(out, fmt.Sprintf("%s read the expanded spelling, which is the folded one: %s", kind, c))
 				}
 			}
+			arm := kind == "Bitmap Heap Scan" && trigramFilter.MatchString(filter)
 			for _, e := range v {
-				walk(e, filter)
+				walk(e, arm)
 			}
 		}
 	}
-	walk(plan, "")
+	walk(plan, false)
 	if !byFold {
 		out = append(out, "no fold's rows were read by its name: the folds were joined to the rows read")
 	}

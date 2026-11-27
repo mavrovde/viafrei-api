@@ -26,8 +26,8 @@ const gazetteerCols = `g.id::text as id, g.kind, g.name, g.name_norm, g.name_en,
 // $8/$9 the prefix-qualified patterns of $1 and $2; $10 the families.
 //
 // The platform's rows, read so that no part reads a whole table or index
-// and no candidate is tested twice (#291; "bamberg" on prod: 617 ms custom,
-// 1 069 ms generic, 29 500 buffers):
+// and no candidate is tested twice (#291; "bamberg" on prod, EXPLAIN
+// ANALYZE 2026-11-27: 455 ms custom, 689 ms generic, 29 503 buffers):
 //   - hits: one arm per spelling and rule, so each bitmap heap scan
 //     rechecks its own condition only. The platform's one OR rechecked every
 //     arm on every trigram candidate (36 000 for "bamberg", whose trigrams

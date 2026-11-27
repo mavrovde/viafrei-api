@@ -312,7 +312,8 @@ ms; strasse 75.2 ms and now 50.6 ms.
 
 `GET /v1/places/resolve` spent its time in `api_place_candidates`, which
 the resolver runs one to three times per text: on prod (2026-11-27, quiet
-database) six resolves made 11 calls of it at 471 ms each, 27 700 buffers
+database) six resolves made 11 calls of it at 471 ms each (the
+`pg_stat_statements` mean over those calls), 27 700 buffers
 each, 5.2 s of the 6.7 s their reads took. Its plans, with `EXPLAIN
 (ANALYZE, BUFFERS)` of the prepared statement, read only:
 
@@ -320,7 +321,7 @@ each, 5.2 s of the 6.7 s their reads took. Its plans, with `EXPLAIN
   the bitmap heap scan rechecked every arm on every trigram candidate:
   36 000 candidates for "bamberg" (every "...berg" shares its trigrams),
   each tested twice when the expanded spelling is the folded one (most
-  texts); 420 ms of the 617;
+  texts), the larger part of each run;
 - the prefix-qualified namesakes ("bad <text>", "neu <text>", ...) were a
   join of the 16 patterns to the table, planned as a sequential scan of
   390 000 rows (105-215 ms, 17 500 buffers), whatever the text;
@@ -368,7 +369,8 @@ plan sources' entries (`api_road_status_planned`).
 The plan sources' entries derive their answer texts with eight JSON paths
 over each entry's payload, a road publication of up to 4.5 MB as text
 (37 kB stored, compressed): each path decompressed the stored value again.
-Dropping the paths took A3 from 324 to 39 ms. The payload is now
+In one ablation run (the statement with the paths replaced by nulls) A3
+took 39 ms where the statement as it was took 324 ms. The payload is now
 decompressed once per entry, in a lateral kept apart by `offset 0`
 (`#> '{}'` is the whole value). A3, the same transaction, six runs each,
 alternating: 319-568 ms (median 360) before, 170-385 ms (median 210) after.

@@ -205,6 +205,28 @@ func TestAMainStationIsFoundUnderEitherSpelling(t *testing.T) {
 	}
 }
 
+// A platform DELFI files under a station's DHID, or under the DHID with a
+// suffix, is that station in the place search, not a place of its own, as
+// the station search collapses it (#192): one Marienplatz a town, not the
+// station and two of its platforms 100 m apart.
+func TestAPlaceSearchAnswersAStationOnceNotItsPlatforms(t *testing.T) {
+	st, _ := private(t,
+		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
+		 values (1, 'de:09998:192', 'Quendelplatz', vf_test.point(null), 1),
+		        (1, 'de:09998:192:4:10', 'Quendelplatz', vf_test.point(null), 0),
+		        (1, 'de:09998:192_G', 'Quendelplatz', vf_test.point(null), 0),
+		        (1, 'de:09997:193', 'Quendelplatz', vf_test.point(null), 0) on conflict do nothing`)
+	const fam = "delfi_static" // the source of the timetable the stops are planted in
+	ps, more, err := st.Places(bounded(t), places.Query{Text: "Quendelplatz", Limit: 5}, nil, []string{fam}, nil)
+	var ids []string
+	for _, p := range ps {
+		ids = append(ids, p.ID)
+	}
+	if err != nil || more || !slices.Equal(ids, []string{"1:de:09997:193", "1:de:09998:192"}) {
+		t.Errorf("places: %v, more %v, %v", ids, more, err)
+	}
+}
+
 // A station search by name answers the names that start with the text
 // before those holding it as a part, and reads the part matches only while
 // the starting ones leave the page short: on a short page the part matches

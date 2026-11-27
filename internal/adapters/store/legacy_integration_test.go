@@ -50,6 +50,14 @@ found as (
     and s.location is not null
     and s.source_ref = any($8)
     and ` + permitted("s") + `
+    -- carried on purpose (#192): a stop of another station is that
+    -- station, as the station search collapses it
+    and not exists (
+        select 1 from contract.stop_place r
+         where r.withdrawn_at is null and r.stop_place_id <> s.stop_place_id
+           and (r.stop_place_id = split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `')
+                or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
+                    and r.stop_place_id ~<~ s.stop_place_id)))
   union all
   select r.road_ref, r.road_ref, 'motorway', pt.location, null, r.source_ref, 0, null, null, false
   from contract.road r

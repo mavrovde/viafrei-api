@@ -152,22 +152,22 @@ it. 1.0.2 is the first published 1.x release.
 
 ### The inventory (REL-015)
 
-`test/inventory` records what the API's consumers ask for, each file from
-the release its first line names (`# source <consumer> <X.Y.Z> <commit>`).
-The release run refuses a file older than its consumer's newest release
-(`inventory age`); export it again from that release's tag first:
+`test/inventory` records what the site asks the API for, each file from the
+release its first line names (`# source <consumer> <X.Y.Z> <commit>`). The
+release run refuses a file older than its consumer's newest release
+(`inventory age`); export it again from that release's tag first. The MCP
+server is not recorded here: the API checks only what comes before it (the
+database it pins), and the MCP server checks the API it pins.
 
 | File | Exported from | Compared with |
 |---|---|---|
-| `mcp.tsv` | `server/catalogue/catalogue.json` of `mavrovde/viafrei-mcp` at the tag of the release npm `viafrei` publishes: `inventory mcp -version X.Y.Z -commit SHA -catalogue catalogue.json` (one row per tool with the sha256 of its compacted input schema, per argument in the schema's order with `language` left out, per resource) | the npm dist-tag `latest` of `viafrei` (`-platform`, as `platformsync read` prints it) |
 | `routes.tsv` | the platform's fragment service, last exported at platform 2.6.44 | nothing: **frozen**, the site moves to the API. `age` prints it as skipped with that reason; it is never exported again |
 | `web.tsv` | the site's source tree at its release tag: `inventory web` | the latest release of `mavrovde/viafrei-web` (`-web`) |
 
 Run the check as the release run does:
 
 ```sh
-go run ./internal/release/inventory age -dir test/inventory \
-  -platform "$(go run ./internal/release/platformsync read -timeout 10s)" -web X.Y.Z
+go run ./internal/release/inventory age -dir test/inventory -web X.Y.Z
 ```
 
 ### Version rules
@@ -181,60 +181,19 @@ go run ./internal/release/inventory age -dir test/inventory \
 Pre-1.0 releases are always pre-releases on GitHub. The OpenAPI diff flags a
 breaking change on the release page even when the version rules allow it.
 
-### Version sync with the platform
+### The platform version in `/v1/meta`
 
-From the "First public release" milestone on, the API's release follows the
-ViaFrei platform's release (REL-001), the way the MCP server's does. The
-sync is `.github/workflows/platform-sync.yml`, weekly (Mondays) and by hand, built on
-`go run ./internal/release/platformsync`:
-
-1. `platformsync read` reads the platform's current release from a public
-   source only: the npm dist-tag `latest` of the package `viafrei` (default)
-   or the latest release of `mavrovde/viafrei-mcp` (`-source github`). One
-   read-only request within `-timeout` (10 s in the workflow); an answer that is not one release version
-   `X.Y.Z` (an error, a draft or pre-release, unreadable JSON) fails the run
-   with exit 2, never a guess.
-2. `platformsync apply -version X.Y.Z` writes the version to
-   `internal/buildinfo/platform-version.txt` and the commit message of the
-   sync: the subject `deps: keep in step with ViaFrei platform X.Y.Z` (the
-   CHANGELOG line, under Dependencies) and, once the API's release follows
-   the platform's, the footer `Release-As: X.Y.Z`. The release follows from
-   the run made with `-start` on: while the API is a 0.x pre-release, only
-   that run writes the footer, and any other moved pin writes none, so
-   release-please goes on with the API's own version. It never goes back: a
-   version older than the synced one or than
-   `version.txt` is refused (exit 1).
-3. The workflow pushes `platform-sync/X.Y.Z`, opens the pull request
-   assigned to a maintainer, and approves its CI and Security runs. A
-   maintainer reviews and squash-merges it; the squash keeps the footer, when there is one.
-   The pull request also pins the parity bundle of `X.Y.Z` in
-   `test/parity/lock.tsv` ([parity](parity.md)): with none pinned the parity
-   harness fails closed, so the sync cannot merge without one.
-4. release-please then proposes exactly `X.Y.Z`: the release pull request
-   bumps `version.txt`, `.release-please-manifest.json` and `CHANGELOG.md` in
-   one commit, and the tag job tags that commit `vX.Y.Z` as for every release.
-
-`/v1/meta` reports `platformVersion` from that file (null before the first
-sync) beside `apiVersion` and `contractVersion`. A deployment checks the
-running service against the platform's release and read-contract version
-with a subcommand that needs no shell in the image:
+`/v1/meta` reports `platformVersion` from `internal/buildinfo/platform-version.txt`
+beside `apiVersion` and `contractVersion`. Nothing writes that file any more:
+the version sync that read the MCP server's release (`platform-sync.yml`,
+`internal/release/platformsync`) is removed, because the API does not read
+its consumers. The file keeps its last synced value until the contract
+decides what `platformVersion` means without the sync. A deployment checks
+the running service against a platform and read-contract version with a
+subcommand that needs no shell in the image:
 
 ```sh
 viafrei-api meta-check -platform X.Y.Z -contract M.m   # 0 match, 1 mismatch (both values named), 2 unreadable
-```
-
-Before the first public release the file says `unsynced` and the scheduled
-run only reports the platform's version. The switch is one manual run of the
-workflow with `start: true` at that milestone; until then no `Release-As`
-footer is used, also when the pinned platform version moves (the parity
-bundle of a platform release is pinned before the first public release).
-
-Try the sync against a fixture version, with no network:
-
-```sh
-go run ./internal/release/platformsync apply -version 2.5.21 -start -message /tmp/msg
-go run ./cmd/viafrei-api version   # "platform":"2.5.21"
-git checkout internal/buildinfo/platform-version.txt
 ```
 
 ## Checklist for the release pull request

@@ -2,9 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,61 +32,10 @@ func call(args ...string) (int, string, string) {
 
 func TestUsage(t *testing.T) {
 	req.Covers(t, "REL-015")
-	for name, args := range map[string][]string{"no command": nil, "an unknown command": {"nope"}, "no version": {"mcp"}, "a bad flag": {"age", "-x"}} {
+	for name, args := range map[string][]string{"no command": nil, "an unknown command": {"nope"}, "no version": {"web"}, "a bad flag": {"age", "-x"}} {
 		if code, out, _ := call(args...); code != 2 || out != "" {
 			t.Errorf("%s: exit %d, stdout %q", name, code, out)
 		}
-	}
-}
-
-func TestMCP(t *testing.T) {
-	req.Covers(t, "REL-015")
-	dir := t.TempDir()
-	// The catalogue as the MCP server's release keeps it: indented,
-	// properties in the schema's order (not sorted), language on every tool.
-	schema := `{
-      "type": "object",
-      "properties": {
-        "roads": {"type": "array", "items": {"type": "string", "pattern": "^A"}},
-        "lat": {"type": "number"},
-        "language": {"type": "string", "enum": ["de", "en"]},
-        "limit": {"type": "integer"}
-      },
-      "required": ["lat"]
-    }`
-	catalogue := write(t, dir, "catalogue.json", `{"tools": [{"name": "find_x", "inputSchema": `+schema+`}], "resources": [{"uri": "viafrei://x"}]}`)
-	code, out, errs := call("mcp", "-version", "2.7.2", "-commit", commit, "-catalogue", catalogue)
-	var compact bytes.Buffer
-	if err := json.Compact(&compact, []byte(schema)); err != nil {
-		t.Fatal(err)
-	}
-	sum := sha256.Sum256(compact.Bytes())
-	want := "# source mcp 2.7.2 " + commit + "\n# kind\tentry\tdetail\ntool\tfind_x\tschema sha256:" + hex.EncodeToString(sum[:]) +
-		"\nargument\tfind_x.roads\tstring[] optional\nargument\tfind_x.lat\tnumber required\nargument\tfind_x.limit\tinteger optional\nresource\tviafrei://x\t-\n"
-	if code != 0 || out != want {
-		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errs)
-	}
-	tool := func(name, s string) string {
-		return write(t, dir, name+".json", `{"tools":[{"name":"find_x","inputSchema":`+s+`}],"resources":[{"uri":"viafrei://x"}]}`)
-	}
-	for name, c := range map[string]struct{ path, want string }{
-		"no tools":              {write(t, dir, "empty.json", `{"resources":[{"uri":"viafrei://x"}]}`), "no tool or no resource"},
-		"no resources":          {write(t, dir, "nores.json", `{"tools":[{"name":"find_x","inputSchema":{}}]}`), "no tool or no resource"},
-		"a broken catalogue":    {write(t, dir, "broken.json", `{`), "broken.json"},
-		"a missing catalogue":   {filepath.Join(dir, "none"), "no such file"},
-		"no input schema":       {tool("noschema", `null`), "tool find_x: the input schema has no properties object"},
-		"a schema not object":   {tool("notobject", `[1]`), "tool find_x: input schema"},
-		"properties not object": {tool("propsarray", `{"properties":[]}`), "no properties object"},
-		"a type not a string":   {tool("typelist", `{"properties":{"lat":{"type":["number","null"]}}}`), "argument lat"},
-		"no type":               {tool("notype", `{"properties":{"lat":{}}}`), "argument lat names no type"},
-		"an array of no type":   {tool("bararray", `{"properties":{"roads":{"type":"array"}}}`), "argument roads names no type"},
-	} {
-		if code, _, errs := call("mcp", "-version", "2.7.2", "-commit", commit, "-catalogue", c.path); code != 2 || !strings.Contains(errs, c.want) {
-			t.Errorf("%s: exit %d, %q", name, code, errs)
-		}
-	}
-	if code, _, errs := call("mcp", "-version", "2.6", "-commit", commit); code != 2 || !strings.Contains(errs, "needs -version X.Y.Z") {
-		t.Errorf("a bad version: exit %d, %q", code, errs)
 	}
 }
 
@@ -198,11 +144,10 @@ func TestWebUnreadableFile(t *testing.T) {
 	}
 }
 
-func inventory(t *testing.T, platform, web string) string {
+func inventory(t *testing.T, routes, web string) string {
 	t.Helper()
 	dir := t.TempDir()
-	write(t, dir, "mcp.tsv", "# source mcp "+platform+" "+commit+"\n")
-	write(t, dir, "routes.tsv", "# source routes "+platform+" "+commit+"\n")
+	write(t, dir, "routes.tsv", "# source routes "+routes+" "+commit+"\n")
 	write(t, dir, "web.tsv", "# source web "+web+" "+commit+"\n")
 	return dir
 }
@@ -210,35 +155,39 @@ func inventory(t *testing.T, platform, web string) string {
 func TestAge(t *testing.T) {
 	req.Covers(t, "REL-015")
 	dir := inventory(t, "2.6.18", "0.1.1")
-	if code, out, errs := call("age", "-dir", dir, "-platform", "2.6.18", "-web", "0.1.1"); code != 0 ||
-		out != "mcp.tsv: platform 2.6.18\nroutes.tsv: routes 2.6.18, skipped (frozen: the site moves to the API)\nweb.tsv: web 0.1.1\n" {
+	if code, out, errs := call("age", "-dir", dir, "-web", "0.1.1"); code != 0 ||
+		out != "routes.tsv: routes 2.6.18, skipped (frozen: the site moves to the API)\nweb.tsv: web 0.1.1\n" {
 		t.Fatalf("current: exit %d, %q, %q", code, out, errs)
 	}
 	// The frozen file is never compared: older than every release, it passes,
 	// and it is named as skipped.
 	frozen := inventory(t, "2.7.2", "0.1.1")
 	write(t, frozen, "routes.tsv", "# source routes 2.6.44 "+commit+"\n")
-	if code, out, errs := call("age", "-dir", frozen, "-platform", "2.7.2", "-web", "0.1.1"); code != 0 || !strings.Contains(out, "routes.tsv: routes 2.6.44, skipped (frozen: the site moves to the API)\n") {
+	if code, out, errs := call("age", "-dir", frozen, "-web", "0.1.1"); code != 0 || !strings.Contains(out, "routes.tsv: routes 2.6.44, skipped (frozen: the site moves to the API)\n") {
 		t.Fatalf("frozen: exit %d, %q, %q", code, out, errs)
 	}
-	if code, _, _ := call("age", "-dir", dir, "-platform", "2.6.17", "-web", "0.1.0"); code != 0 {
+	if code, _, _ := call("age", "-dir", dir, "-web", "0.1.0"); code != 0 {
 		t.Fatalf("newer than the newest release: exit %d", code)
 	}
-	for name, c := range map[string][2]string{"a newer platform patch": {"2.6.19", "0.1.1"}, "a newer platform minor": {"2.7.0", "0.1.1"}, "a newer site": {"2.6.18", "1.0.0"}} {
-		code, _, errs := call("age", "-dir", dir, "-platform", c[0], "-web", c[1])
+	for name, web := range map[string]string{"a newer site patch": "0.1.2", "a newer site minor": "0.2.0", "a newer site major": "1.0.0"} {
+		code, _, errs := call("age", "-dir", dir, "-web", web)
 		if code != 1 || !strings.Contains(errs, "export it again") {
 			t.Errorf("%s: exit %d, %q", name, code, errs)
 		}
 	}
-	if code, _, errs := call("age", "-dir", dir, "-platform", "2.6", "-web", "0.1.1"); code != 2 || !strings.Contains(errs, "-platform X.Y.Z") {
+	if code, _, errs := call("age", "-dir", dir, "-web", "0.1"); code != 2 || !strings.Contains(errs, "-web X.Y.Z") {
 		t.Errorf("a bad version: exit %d, %q", code, errs)
 	}
-	if code, _, _ := call("age", "-dir", t.TempDir(), "-platform", "2.6.18", "-web", "0.1.1"); code != 2 {
+	if code, _, _ := call("age", "-dir", t.TempDir(), "-web", "0.1.1"); code != 2 {
 		t.Errorf("no files: exit %d", code)
+	}
+	// The MCP server's release is no input any more: -platform is a usage error.
+	if code, _, _ := call("age", "-dir", dir, "-platform", "2.7.2", "-web", "0.1.1"); code != 2 {
+		t.Errorf("-platform: exit %d, want 2", code)
 	}
 	bad := inventory(t, "2.6.18", "0.1.1")
 	write(t, bad, "routes.tsv", "routes without a header\n")
-	if code, _, errs := call("age", "-dir", bad, "-platform", "2.6.18", "-web", "0.1.1"); code != 2 || !strings.Contains(errs, "routes.tsv: the first line") {
+	if code, _, errs := call("age", "-dir", bad, "-web", "0.1.1"); code != 2 || !strings.Contains(errs, "routes.tsv: the first line") {
 		t.Errorf("no header: exit %d, %q", code, errs)
 	}
 }
@@ -256,15 +205,15 @@ func TestOnlyRoutesIsFrozen(t *testing.T) {
 		if frozen != (consumer == "frozen") {
 			t.Errorf("%s: consumer %q, frozen %v", n, consumer, frozen)
 		}
-		if !frozen && consumer != "platform" && consumer != "web" {
+		if !frozen && consumer != "web" {
 			t.Errorf("%s: consumer %q has no -flag age compares with", n, consumer)
 		}
 	}
 	// Every file but routes.tsv refuses when it is behind.
-	for _, n := range []string{"mcp.tsv", "web.tsv"} {
+	for _, n := range []string{"web.tsv"} {
 		dir := inventory(t, "2.7.2", "0.1.1")
 		write(t, dir, n, "# source x 0.0.1 "+commit+"\n")
-		if code, out, errs := call("age", "-dir", dir, "-platform", "2.7.2", "-web", "0.1.1"); code != 1 || strings.Contains(out, n) || !strings.Contains(errs, n+" records") {
+		if code, out, errs := call("age", "-dir", dir, "-web", "0.1.1"); code != 1 || strings.Contains(out, n) || !strings.Contains(errs, n+" records") {
 			t.Errorf("%s behind: exit %d, %q, %q", n, code, out, errs)
 		}
 	}

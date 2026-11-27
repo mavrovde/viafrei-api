@@ -1,9 +1,10 @@
 // Package buildinfo carries the version facts of a build: the API version and
 // commit injected at build time with
 // -ldflags "-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=...",
-// and the ViaFrei platform version this build is kept in step with, read
-// from platform-version.txt beside this file, which only the version sync
-// writes (docs/RELEASING.md).
+// and the ViaFrei platform version /v1/meta reports, read from
+// platform-version.txt beside this file. No tool writes it since the version
+// sync was removed (the API reads no consumer); it keeps its last synced value
+// (docs/RELEASING.md).
 package buildinfo
 
 import (

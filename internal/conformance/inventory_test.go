@@ -12,13 +12,13 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-// The inventory gate: the API serves everything its two consumers ask for.
-// test/inventory holds what the MCP server's release offers (mcp.tsv: tools,
-// their arguments, resources), the fragment routes the platform's fragment
-// service registered (routes.tsv, frozen at its last export: the site moves
-// to the API) and the fragment paths the site's release asks for
-// (web.tsv), each exported by internal/release/inventory from the release it
-// names; mapping.tsv says which operation and parity case serve each entry.
+// The inventory gate: the API serves everything the site asks for.
+// test/inventory holds the fragment routes the platform's fragment service
+// registered (routes.tsv, frozen at its last export: the site moves to the
+// API) and the fragment paths the site's release asks for (web.tsv), each
+// exported by internal/release/inventory from the release it names;
+// mapping.tsv says which operation and parity case serve each entry. The MCP
+// server is not read here: it is a consumer that checks the API it pins.
 
 // inventoryRows returns the data rows of an inventory file, split at tabs.
 func inventoryRows(src string) [][]string {
@@ -31,13 +31,10 @@ func inventoryRows(src string) [][]string {
 	return out
 }
 
-// inventoryEntries lists every entry the API must serve: each MCP tool,
-// argument and resource, and each fragment path of the site.
-func inventoryEntries(mcp, web string) []string {
+// inventoryEntries lists every entry the API must serve: each fragment path
+// of the site.
+func inventoryEntries(web string) []string {
 	var out []string
-	for _, r := range inventoryRows(mcp) {
-		out = append(out, r[0]+":"+r[1])
-	}
 	for _, r := range inventoryRows(web) {
 		out = append(out, "web:"+r[0])
 	}
@@ -224,12 +221,12 @@ func parityCases(t *testing.T) map[string]string {
 // operation a parity case checks, or ruled out by the owner in mapping.tsv.
 func TestInventoryIsServed(t *testing.T) {
 	req.Covers(t, "REL-015")
-	mcp, web := readText(t, "test", "inventory", "mcp.tsv"), readText(t, "test", "inventory", "web.tsv")
+	web := readText(t, "test", "inventory", "web.tsv")
 	ops, err := apiOperations([]byte(readText(t, "api", "openapi.json")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries := inventoryEntries(mcp, web)
+	entries := inventoryEntries(web)
 	if len(entries) < 50 {
 		t.Fatalf("only %d inventory entries read; the files were not read", len(entries))
 	}
@@ -249,8 +246,8 @@ func TestInventoryRulesCanSayNo(t *testing.T) {
 	ops := map[string]apiOperation{"listX": {params: []string{"at"}}}
 	cases := map[string]string{"x-1": "listX", "y-1": "listY"}
 	routes := "GET\t/internal/x/:id\n"
-	entries := []string{"tool:find_x", "argument:find_x.lat", "web:/internal/x/{}"}
-	good := "tool:find_x\tlistX\tx-1\t-\nargument:find_x.lat\tlistX?at\tx-1\t-\nweb:/internal/x/{}\t-\t-\towner 2026-11-16: the site's own\n"
+	entries := []string{"web:/v1/x", "web:/v1/x/lat", "web:/internal/x/{}"}
+	good := "web:/v1/x\tlistX\tx-1\t-\nweb:/v1/x/lat\tlistX?at\tx-1\t-\nweb:/internal/x/{}\t-\t-\towner 2026-11-16: the site's own\n"
 	if f, n := inventoryFindings(entries, routes, good, ops, cases, []string{"/internal/x/{}"}); len(f) != 0 || n != 3 {
 		t.Fatalf("the good mapping: %v, %d served", f, n)
 	}
@@ -263,14 +260,14 @@ func TestInventoryRulesCanSayNo(t *testing.T) {
 		mapping string
 		web     []string
 	}{
-		"nothing serves tool:find_x":          {strings.Replace(good, "tool:find_x\tlistX\tx-1\t-\n", "", 1), nil},
-		"is in no inventory file":             {good + "tool:gone\tlistX\tx-1\t-\n", nil},
-		"has two rows":                        {good + "tool:find_x\tlistX\tx-1\t-\n", nil},
-		"does not hold 4 fields":              {good + "tool:find_x\tlistX\n", nil},
-		"the API has no operation listZ":      {strings.Replace(good, "tool:find_x\tlistX", "tool:find_x\tlistZ", 1), nil},
+		"nothing serves web:/v1/x":            {strings.Replace(good, "web:/v1/x\tlistX\tx-1\t-\n", "", 1), nil},
+		"is in no inventory file":             {good + "web:/gone\tlistX\tx-1\t-\n", nil},
+		"has two rows":                        {good + "web:/v1/x\tlistX\tx-1\t-\n", nil},
+		"does not hold 4 fields":              {good + "web:/v1/x\tlistX\n", nil},
+		"the API has no operation listZ":      {strings.Replace(good, "web:/v1/x\tlistX", "web:/v1/x\tlistZ", 1), nil},
 		"listX has no parameter radius":       {strings.Replace(good, "listX?at", "listX?radius", 1), nil},
-		"no parity case x-9":                  {strings.Replace(good, "tool:find_x\tlistX\tx-1", "tool:find_x\tlistX\tx-9", 1), nil},
-		"no parity case checks the operation": {strings.Replace(good, "tool:find_x\tlistX\tx-1", "tool:find_x\tlistX\ty-1", 1), nil},
+		"no parity case x-9":                  {strings.Replace(good, "web:/v1/x\tlistX\tx-1", "web:/v1/x\tlistX\tx-9", 1), nil},
+		"no parity case checks the operation": {strings.Replace(good, "web:/v1/x\tlistX\tx-1", "web:/v1/x\tlistX\ty-1", 1), nil},
 		"no dated owner ruling":               {strings.Replace(good, "owner 2026-11-16: the site's own", "the site's own", 1), nil},
 		"which no route of routes.tsv":        {good, []string{"/internal/x/{}/more"}},
 		"names the opaque route":              {good, []string{"/internal/y"}},

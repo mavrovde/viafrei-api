@@ -3,6 +3,7 @@
 package store_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -124,8 +125,10 @@ func TestARailwaySearchByNameKeepsTheDBStations(t *testing.T) {
 		 values ('999000930', 'Lindenhof Hbf', 'test', now(), now(), now(), 'de:09998:930', 'db_stada', '9999930')`)
 	fams := families(t, st, "transit")
 	for _, text := range []string{"Lindenhof Hbf", "Lindenhof(Hbf)"} {
+		// Every stop too answers DB's station first: of two stops of one
+		// name, the one with an EVA number leads (#191 A3), whatever the ids.
 		all, _, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 1}, fams)
-		if err != nil || len(all) != 1 || all[0].ID != "1:000099980001" {
+		if err != nil || len(all) != 1 || all[0].ID != "1:de:09998:930" {
 			t.Errorf("%s, every stop: %+v, %v", text, all, err)
 		}
 		rail, _, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 1, Railway: true}, fams)
@@ -133,6 +136,45 @@ func TestARailwaySearchByNameKeepsTheDBStations(t *testing.T) {
 			rail[0].RegisterName == nil || *rail[0].RegisterName != "Lindenhof Hbf" || rail[0].RegisterBy == nil || *rail[0].RegisterBy != "db_stada" {
 			t.Errorf("%s, railway: %+v, %v", text, rail, err)
 		}
+	}
+}
+
+// Of the stops of one name a text finds, as the platform's stop resolver
+// weighs them (#229 B, #191 A3): the one with an EVA number first, then
+// one whose family has a planned call, then one filed under a DHID, then by
+// id; the one a person means leads at limit 1 even where two lower ids of
+// the name would fill the page the limit reads.
+func TestStopsOfOneNameLeadWithTheEVAThenTheServedThenTheDHID(t *testing.T) {
+	st, _ := private(t,
+		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
+		 values (1, '000099980711', 'Quellhof, Bahnhof (Bus)', vf_test.point(null), 0),
+		        (1, '000099980712', 'Quellhof, Bahnhof (Bus)', vf_test.point(null), 0),
+		        (1, '000099980713', 'Quellhof, Bahnhof (Bus)', vf_test.point(null), 0),
+		        (1, '000099980721', 'Quellhof Mitte', vf_test.point(null), 0),
+		        (1, '000099980722', 'Quellhof Mitte', vf_test.point(null), 0),
+		        (1, '000099980731', 'Quellhof Nord', vf_test.point(null), 0),
+		        (1, 'de:09998:731', 'Quellhof Nord', vf_test.point(null), 1) on conflict do nothing`,
+		`insert into public.stop_times select (jsonb_populate_record(null::public.stop_times,
+		     to_jsonb(s) || jsonb_build_object('stop_id', '000099980713', 'stop_sequence', 99713))).*
+		   from public.stop_times s join public.trips t on t.gtfs_feed_key = s.gtfs_feed_key and t.id = s.trip_id and t.deleted_at is null
+		  where s.gtfs_feed_key = 1 and s.deleted_at is null limit 1`,
+		`insert into public.db_stations (station_no, name, content_hash, first_seen_at, last_seen_at, updated_at, ifopt, source_id, eva_no)
+		 values ('999000722', 'Quellhof Mitte', 'test', now(), now(), now(), '000099980722', 'db_stada', '9999722')`)
+	fams := families(t, st, "transit")
+	for text, want := range map[string]string{
+		"Quellhof, Bahnhof (Bus)": "1:000099980713",
+		"Quellhof Mitte":          "1:000099980722",
+		"Quellhof Nord":           "1:de:09998:731",
+	} {
+		ss, more, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 1}, fams)
+		if err != nil || len(ss) != 1 || ss[0].ID != want || !more {
+			t.Errorf("%s: %v, more %v, %v; want %s and more", text, stationIDs(ss), more, err, want)
+		}
+	}
+	// The rest of a name keeps the id order.
+	ss, _, err := st.Stations(bounded(t), transit.Query{Text: "Quellhof, Bahnhof (Bus)", Limit: 5}, fams)
+	if got := stationIDs(ss); err != nil || !slices.Equal(got, []string{"1:000099980713", "1:000099980711", "1:000099980712"}) {
+		t.Errorf("the whole name: %v, %v", got, err)
 	}
 }
 

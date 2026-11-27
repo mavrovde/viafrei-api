@@ -155,7 +155,7 @@ where s.withdrawn_at is null
 order by dist, s.name, s.stop_place_id`
 			}
 			body = `,` + keyed("page", keys(""), "$6") + `
-` + keyedPage("page", "k.dist, k.name, k.stop_place_id", "$6")
+` + keyedPage("page", "k.dist, k.name", "$6")
 			if staged {
 				// A text with no position answers the names that start with
 				// it before those holding it as a part, so the part matches
@@ -175,7 +175,7 @@ order by dist, s.name, s.stop_place_id`
 					keyed("rest", keys("\n  and (select count(*) from first) < $6::bigint\n  and "+stationHolds+
 						"\n  and not exists (select 1 from first f where f.stop_place_id = s.stop_place_id)"), "$6") + `,
 arms as (select 0 o, f.stop_place_id, f.name, f.dist from first f union all select 1 o, r.stop_place_id, r.name, r.dist from rest r)
-` + keyedPage("arms", "k.o, k.dist, k.name, k.stop_place_id", "$6")
+` + keyedPage("arms", "k.o, k.dist, k.name", "$6")
 			}
 		}
 		out[m] = namedOpaque(fmt.Sprintf("api_stations_page_%02d", m), `
@@ -245,17 +245,48 @@ const (
 // every stop that held "strasse" (71 924 on prod) took 8 s, and leaving the
 // stops out after a page was read left it short where the page was one
 // station's platforms ("hauptbahnhof" at 61 lost six stations, 2026-11-24).
+//
+// The limit keeps every key that shares its distance and name with one
+// within it (rank, not row_number): keyedPage orders the stops of one name
+// by what only their full rows say (stationTies), so the one a person
+// means reaches the page even where its id sorts it past the limit.
 func keyed(name, sel, limit string) string {
 	return `
-` + name + ` as (select k.stop_place_id, k.name, k.dist from (` + sel + `
+` + name + ` as (select w.stop_place_id, w.name, w.dist from (
+  select k.stop_place_id, k.name, k.dist, rank() over (order by k.dist, k.name) r from (` + sel + `
 offset 0) k
-where ` + ownStation("k.stop_place_id") + `
-order by k.dist, k.name, k.stop_place_id
-limit ` + limit + `::bigint)`
+  where ` + ownStation("k.stop_place_id") + `) w
+where w.r <= ` + limit + `::bigint)`
 }
 
-// keyedPage answers the stations of the keys of the CTE name, in order,
-// limit at most, each read by its key.
+// stationTies orders the stops of one name a text search finds (alias a,
+// a row of relStopPlace) as the platform's stop resolver weighs them: the
+// one carrying an EVA number first, so DB's station is never outranked by
+// a same-named stop of the timetable without one ("Frankfurt (Main)
+// Hauptbahnhof" is the stop 000010900302 too, which has none); then one
+// whose family has a call (stationServed), as the resolver offers no
+// family without stop times ("Leipzig, Hauptbahnhof (Tram/Bus)" is also
+// 000001300091, with none, beside the family de:14713:13000 the boards
+// read); then one filed under a DHID, the national stop code the resolver
+// keys a family by; then by id. Each key sorts false before true.
+func stationTies(a string) string {
+	return `(` + a + `.eva_no is null), not ` + stationServed(a+".stop_place_id") + `, (` + a + `.national_stop_code is null)`
+}
+
+// stationServed is whether a call of a live trip is planned at a stop of
+// the family of the station id (stationFamily), as the platform's stop
+// resolver's familyHasTimes reads it: one index probe a member, up to the
+// first that has one.
+func stationServed(id string) string {
+	return `exists (
+    select 1 from (` + stationFamily(id) + `) sf(id)
+      join stop_times sst on sst.gtfs_feed_key = split_part(sf.id, ':', 1)::smallint
+                         and sst.stop_id = substr(sf.id, strpos(sf.id, ':') + 1) and sst.deleted_at is null
+      join trips stt on stt.gtfs_feed_key = sst.gtfs_feed_key and stt.id = sst.trip_id and stt.deleted_at is null)`
+}
+
+// keyedPage answers the stations of the keys of the CTE name, in the order
+// order, then stationTies, then id, limit at most, each read by its key.
 func keyedPage(name, order, limit string) string {
 	return `select p.stop_place_id, p.name, st_y(p.location) lat, st_x(p.location) lon, p.national_stop_code, p.region_code,
        coalesce(p.modes, '{}') modes, p.source_ref, k.dist, p.placement_source_ref, p.eva_no, p.eva_numbers,
@@ -266,7 +297,7 @@ cross join lateral (select s.stop_place_id, s.name, s.location, s.national_stop_
                       from (` + relStopPlace + `) s
                      where s.stop_place_id = k.stop_place_id
                      limit 1) p
-order by ` + order + `
+order by ` + order + `, ` + stationTies("p") + `, k.stop_place_id
 limit ` + limit + `::bigint`
 }
 
@@ -452,7 +483,7 @@ where s.withdrawn_at is null
   and left(s.area_key, 5) = any($4::text[]) and s.region_code is not null
   and `+strings.NewReplacer("$4", "$2", "$10", "$3").Replace(stationHolds)+db+`
 order by s.name, s.stop_place_id`, "$5")+`
-`+keyedPage("page", "k.name, k.stop_place_id", "$5"), "text[]", "text", "text[]", "text[]", "bigint")
+`+keyedPage("page", "k.name", "$5"), "text[]", "text", "text[]", "text[]", "bigint")
 }
 
 // stationsInTown reads a text no station's name holds as a town and a stop

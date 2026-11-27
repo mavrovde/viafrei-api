@@ -360,7 +360,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			Info: &huma.Info{
 				Title:       Title,
 				Version:     InterfaceVersion,
-				Description: "Keyed, read-only access to live German mobility context. This document is generated from the code.",
+				Description: "Keyed, read-only access to live German mobility context. HEAD mirrors every GET operation without a body, and a 405 names the methods its path serves in Allow. This document is generated from the code.",
 				License:     &huma.License{Name: "Terms of use", URL: "https://viafrei.de/"},
 				Contact:     &huma.Contact{Name: "ViaFrei API maintainers", URL: "https://github.com/mavrovde/viafrei-api/issues"},
 			},

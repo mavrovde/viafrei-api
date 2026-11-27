@@ -65,7 +65,7 @@ var TransportHeaders = map[string]string{
 var ProblemHeaders = map[string]string{
 	"Cache-Control": "a problem is never stored",
 	"Retry-After":   "equal to the problem's retryAfter where it has one",
-	"Allow":         "a 405 names the methods its path serves (RFC 9110 15.5.6)",
+	"Allow":         "a 405 names the methods its path serves (RFC 9110 15.5.6); HEAD mirrors every GET, so HEAD is named wherever GET is",
 }
 
 var methods = []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"}

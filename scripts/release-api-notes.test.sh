@@ -17,10 +17,10 @@ echo 'null' > "$t/null.json"
 echo '{"x":1}' > "$t/obj.json"
 out=$(bash "$s" "$t/one.json" "$t/cl.txt" v1.0.0); check "break heads Breaking" "## ⚠ Breaking API changes" "$out"
 out=$(bash "$s" "$t/none.json" "$t/cl.txt" v1.0.0); check "no break heads non-breaking" "## API changes (non-breaking)" "$out"
-[[ $out != *Breaking* ]] && echo "ok   no break never says Breaking" || { echo "FAIL no break says Breaking"; fail=1; }
+if [[ $out != *Breaking* ]]; then echo "ok   no break never says Breaking"; else echo "FAIL no break says Breaking"; fail=1; fi
 out=$(bash "$s" "$t/null.json" "$t/cl.txt" v1.0.0); check "null is no break" "(non-breaking)" "$out"
 : > "$t/empty.txt"
-out=$(bash "$s" "$t/none.json" "$t/empty.txt" v1.0.0); [[ -z $out ]] && echo "ok   no change prints nothing" || { echo "FAIL no change printed: $out"; fail=1; }
+out=$(bash "$s" "$t/none.json" "$t/empty.txt" v1.0.0); if [[ -z $out ]]; then echo "ok   no change prints nothing"; else echo "FAIL no change printed: $out"; fail=1; fi
 if bash "$s" "$t/obj.json" "$t/cl.txt" v1.0.0 >/dev/null 2>&1; then echo "FAIL an object passed"; fail=1; else echo "ok   an object fails"; fi
 : > "$t/empty.json"
 if bash "$s" "$t/empty.json" "$t/cl.txt" v1.0.0 >/dev/null 2>&1; then echo "FAIL an empty file passed"; fail=1; else echo "ok   an empty file fails"; fi

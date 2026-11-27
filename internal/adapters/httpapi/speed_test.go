@@ -57,3 +57,25 @@ func TestSpeedCamerasAnswer(t *testing.T) {
 	f.err = access.ErrNonePermitted
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/speed-cameras?at=50.94,6.96", bearer), 403, "source-not-permitted")
 }
+
+// An answer that holds no camera (#301: a place with only a webcam in
+// reach) lists none in either block, credits no family, and still carries
+// the § 23 Abs. 1c StVO notice as its condition.
+func TestSpeedCamerasNoneHeld(t *testing.T) {
+	req.Covers(t, "ENV-040")
+	f := everyAnswer()
+	f.speed = features.SpeedAnswer{Meta: features.Answer[struct{}]{At: fixedNow}, Notice: roads.SpeedNotice("de")}
+	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/speed-cameras?at=53.55,10.0", bearer)
+	body := w.Body.String()
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, body)
+	}
+	for _, want := range []string{`"official":[]`, `"officialTotal":0`, `"osm":[]`, `"osmTotal":0`, `"hasMore":false`, "§ 23 Abs. 1c StVO"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("answer lacks %s: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "hh_verkehrskameras") {
+		t.Errorf("a webcam family credited: %s", body)
+	}
+}

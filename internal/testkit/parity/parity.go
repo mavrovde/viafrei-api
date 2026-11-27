@@ -1,8 +1,8 @@
 // Package parity compares the answers of this API with the facts the MCP
 // capability gives for the same question on the same fixture rows (TEST-009,
 // FR-GEN-002). A bundle holds the questions and the expected facts; it is
-// pinned per platform version in a lock file and verified by checksum before
-// use. The projection rules turn a response body into facts both sides can
+// pinned in a lock file under the platform version the MCP side answered it
+// at, and verified by checksum before use. The projection rules turn a response body into facts both sides can
 // state the same way. Nothing here touches the network.
 package parity
 
@@ -497,6 +497,45 @@ var (
 // not be stated by its family and would not be compared.
 var ErrUnownedNote = errors.New("parity: a note no family owns")
 
+// RegressionLock is the lock file's name of the API's own recording, the
+// regression lock (docs/parity.md). It is a bundle name, no version.
+const RegressionLock = "unsynced"
+
+// Newest is the lock file's newest pinned platform version X.Y.Z, the bundle
+// the parity run compares. The key is the version the MCP side answered the
+// bundle at, which a later pin never changes, so the choice needs no build
+// fact of the API (the API's own version is not the MCP side's).
+func Newest(fsys fs.FS) (string, error) {
+	lock, err := fs.ReadFile(fsys, LockFile)
+	if err != nil {
+		return "", err
+	}
+	best, bestKey := "", [3]int{}
+	err = eachPin(lock, func(name, _, _ string) bool {
+		m := releaseKey.FindStringSubmatch(name)
+		if m == nil {
+			return false
+		}
+		var k [3]int
+		for i := range k {
+			k[i], _ = strconv.Atoi(m[i+1])
+		}
+		if best == "" || slices.Compare(k[:], bestKey[:]) > 0 {
+			best, bestKey = name, k
+		}
+		return false
+	})
+	if err != nil {
+		return "", err
+	}
+	if best == "" {
+		return "", fmt.Errorf("%w: no X.Y.Z version in %s", ErrNotPinned, LockFile)
+	}
+	return best, nil
+}
+
+var releaseKey = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
 // Load reads the bundle pinned for platform in the lock file of fsys, after
 // verifying its checksum.
 func Load(fsys fs.FS, platform string) (Bundle, error) {
@@ -525,21 +564,41 @@ func Checksum(b []byte) string {
 }
 
 func pinned(lock []byte, platform string) (string, string, error) {
+	var path, sum string
+	err := eachPin(lock, func(name, p, s string) bool {
+		if name == platform {
+			path, sum = p, s
+			return true
+		}
+		return false
+	})
+	switch {
+	case err != nil:
+		return "", "", err
+	case path == "":
+		return "", "", fmt.Errorf("%w: %q", ErrNotPinned, platform)
+	}
+	return path, sum, nil
+}
+
+// eachPin calls f with every pin of the lock file, in order, until f
+// returns true; a malformed line stops it with ErrMalformed.
+func eachPin(lock []byte, f func(name, path, sum string) bool) error {
 	sc := bufio.NewScanner(bytes.NewReader(lock))
 	for n := 1; sc.Scan(); n++ {
 		line := sc.Text()
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		f := strings.Split(line, "\t")
-		if len(f) != 3 {
-			return "", "", fmt.Errorf("%w: %s:%d wants platform, bundle and sha256", ErrMalformed, LockFile, n)
+		c := strings.Split(line, "\t")
+		if len(c) != 3 {
+			return fmt.Errorf("%w: %s:%d wants platform, bundle and sha256", ErrMalformed, LockFile, n)
 		}
-		if f[0] == platform {
-			return f[1], f[2], nil
+		if f(c[0], c[1], c[2]) {
+			return nil
 		}
 	}
-	return "", "", fmt.Errorf("%w: %q", ErrNotPinned, platform)
+	return nil
 }
 
 // Parse decodes a bundle and checks it is one this package can compare.

@@ -4025,7 +4025,7 @@
             "type": "string"
           },
           "platformVersion": {
-            "description": "ViaFrei platform release this build is kept in step with (version sync); null before the first sync.",
+            "description": "ViaFrei platform version: the API's own release version, the value apiVersion states. The type stays nullable; this service always states it.",
             "type": [
               "string",
               "null"
@@ -16872,7 +16872,7 @@
     },
     "/v1/meta": {
       "get": {
-        "description": "The API version, the build revision, the read-contract version and the platform release the build is kept in step with.",
+        "description": "The API version, the build revision, the read-contract version and the platform version, which is the API's own release version.",
         "operationId": "getMeta",
         "responses": {
           "200": {
@@ -16886,7 +16886,7 @@
                         "apiVersion": "1.0.0-example",
                         "buildSha": "0123456789ab",
                         "contractVersion": "0.3",
-                        "platformVersion": null,
+                        "platformVersion": "1.0.0-example",
                         "openapi": "https://api.viafrei.de/v1/openapi.json",
                         "languages": [
                           "en"

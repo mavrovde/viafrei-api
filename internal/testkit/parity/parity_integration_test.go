@@ -81,12 +81,15 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// platform is the lock file's name for the pinned platform version.
-func platform() string {
-	if p := buildinfo.Get().Platform; p != "" {
-		return p
+// platform is the lock file's newest pinned platform version: the MCP side's
+// bundle the parity run compares (parity.Newest).
+func platform(t *testing.T) string {
+	t.Helper()
+	p, err := parity.Newest(os.DirFS(dir))
+	if err != nil {
+		t.Fatal(err)
 	}
-	return buildinfo.Unsynced
+	return p
 }
 
 var seeded = map[parity.Fixture]string{}
@@ -563,12 +566,13 @@ func TestParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, a := compare(t, platform(), deferred)
+	name := platform(t)
+	b, a := compare(t, name, deferred)
 	switch b.Producer {
 	case parity.ProducerAPI:
-		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", platform())
+		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", name)
 	case parity.ProducerMCP:
-		t.Logf("bundle %s was produced by the MCP side at platform commit %s: parity evidence", platform(), b.Commit)
+		t.Logf("bundle %s was produced by the MCP side at platform commit %s: parity evidence", name, b.Commit)
 	}
 
 	// A planted change in one projection rule must fail and name the fact.
@@ -609,15 +613,15 @@ func TestRegressionLock(t *testing.T) {
 	if *record {
 		recordBundle(t)
 	}
-	if b, _ := compare(t, buildinfo.Unsynced, nil); b.Producer != parity.ProducerAPI {
-		t.Errorf("the regression lock %s is produced by %q; it is the API's own recording", buildinfo.Unsynced, b.Producer)
+	if b, _ := compare(t, parity.RegressionLock, nil); b.Producer != parity.ProducerAPI {
+		t.Errorf("the regression lock %s is produced by %q; it is the API's own recording", parity.RegressionLock, b.Producer)
 	}
 }
 
 // TestInventory: every operation with an MCP counterpart has a case.
 func TestInventory(t *testing.T) {
 	req.Covers(t, "TEST-009")
-	b, err := parity.Load(os.DirFS(dir), platform())
+	b, err := parity.Load(os.DirFS(dir), platform(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,7 +647,7 @@ func recordBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	name := buildinfo.Unsynced
+	name := parity.RegressionLock
 	b := parity.Bundle{Format: parity.Format, Platform: name, Producer: parity.ProducerAPI, Rules: parity.Default.ID, Fixture: q.Fixture}
 	if got := seed(t, b.Fixture); got != q.Fixture.SHA256 {
 		t.Fatalf("the fixture rows are %s, %s names %s", got, parity.QuestionsFile, q.Fixture.SHA256)
@@ -677,8 +681,8 @@ func recordBundle(t *testing.T) {
 		}
 	}
 	if lock == "" {
-		lock = "# Parity bundles pinned per platform version: platform, bundle, sha256.\n" +
-			"# Pinned by the version sync; see docs/parity.md.\n"
+		lock = "# Parity bundles pinned per MCP platform version they were answered at:\n" +
+			"# platform, bundle, sha256. See docs/parity.md.\n"
 	}
 	lock += name + "\t" + file + "\t" + parity.Checksum(raw) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, parity.LockFile), []byte(lock), 0o600); err != nil {

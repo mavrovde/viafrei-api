@@ -10,7 +10,7 @@ fixture rows, offline: no live MCP server, no network.
 |---|---|
 | Questions: what both sides are asked, and the fixture rows they are asked on | `test/parity/questions.json` |
 | Bundle: the questions and the facts the capability answered | `test/parity/bundles/<platform>.json` |
-| Lock file: one bundle per platform version, with its SHA-256 | `test/parity/lock.tsv` |
+| Lock file: one bundle per MCP platform version it was answered at, with its SHA-256 | `test/parity/lock.tsv` |
 | Projection rules, loader, inventory and comparator | `internal/testkit/parity` |
 | Harness: seeds a throwaway PostGIS, asks the real handler, compares | `internal/testkit/parity/parity_integration_test.go` |
 
@@ -368,7 +368,7 @@ compared only by a checkout of its own time.
 
 - A fact missing, extra or changed: the harness prints each one by name, for
   example `changed data[cs-05-0012].location.lat: want "50.82957", got "50.8296"`.
-- No bundle pinned for the platform version in `internal/buildinfo/platform-version.txt`.
+- No `X.Y.Z` version pinned in the lock file.
 - A bundle whose bytes do not match the lock file's SHA-256, checked before
   it is parsed.
 - An empty bundle, an unknown member, another format, platform or rule set,
@@ -395,9 +395,13 @@ produced the bundle it compared.
 
 ## Two bundles, two jobs
 
-- **Parity evidence** is the bundle pinned for the platform version in
-  `internal/buildinfo/platform-version.txt`, produced by the MCP side
-  (`"producer": "mcp"`). `TestParity` compares it.
+- **Parity evidence** is the bundle pinned under the lock file's newest
+  `X.Y.Z` version, ordered by number (`parity.Newest`), produced by the MCP
+  side (`"producer": "mcp"`). `TestParity` compares it. The key is the MCP
+  platform version the bundle was answered at, which no later pin changes;
+  the choice reads no build fact of the API, whose own version is the one
+  `/v1/meta` states as `platformVersion` (docs/RELEASING.md). Pinning a newer
+  MCP bundle makes it the one compared.
 - **The regression lock** is `bundles/unsynced.json`, the API's own recording
   (`"producer": "api"`). `TestRegressionLock` compares it on every run. The
   API agrees with it by construction, so it is no evidence of parity.

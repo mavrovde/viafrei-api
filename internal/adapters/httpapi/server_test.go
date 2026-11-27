@@ -146,8 +146,8 @@ func TestMetaEnvelopeAndVersions(t *testing.T) {
 	if data["apiVersion"] != "0.2.0-test" || data["buildSha"] != "abc1234" || data["contractVersion"] != "0.1" {
 		t.Fatalf("versions: %v", data)
 	}
-	if v, present := data["platformVersion"]; !present || v != nil {
-		t.Fatalf("platformVersion must be present and null for an unsynced build: %v", data)
+	if data["platformVersion"] != "0.2.0-test" {
+		t.Fatalf("platformVersion must be the API's own version: %v", data)
 	}
 	meta := body["meta"].(map[string]any)
 	if meta["requestId"] != "client-req-0001" || w.Header().Get("X-Request-Id") != "client-req-0001" {
@@ -161,11 +161,12 @@ func TestMetaEnvelopeAndVersions(t *testing.T) {
 	}
 }
 
-func TestMetaReportsThePlatformVersionOfASyncedBuild(t *testing.T) {
+// The platform version is the API's own release version (REL-001).
+func TestMetaReportsTheAPIVersionAsThePlatformVersion(t *testing.T) {
 	req.Covers(t, "FR-SVC-003", "REL-001")
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config:          config.Defaults(),
-		Build:           buildinfo.Info{Version: "2.5.21", Commit: "abc1234", Platform: "2.5.21"},
+		Build:           buildinfo.Info{Version: "2.5.21", Commit: "abc1234"},
 		ContractVersion: "0.1",
 		Now:             func() time.Time { return fixedNow },
 	})

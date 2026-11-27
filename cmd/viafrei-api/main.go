@@ -260,14 +260,14 @@ func healthcheck(environ []string, stderr io.Writer) int {
 
 // metaCheck is the platform deployment check's half inside the container:
 // it asks the running service's own /v1/meta and compares the platform
-// release and the read-contract version with the ones the deployment
+// version (the API's own release version) and the read-contract version with the ones the deployment
 // expects. Exit 0 on a match, 1 on a mismatch (both values named), 2 when the
 // answer cannot be read or the flags are wrong, never a pass.
 func metaCheck(args, environ []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("meta-check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var want httpapi.Versions
-	fs.StringVar(&want.Platform, "platform", "", "platform release X.Y.Z the service must report")
+	fs.StringVar(&want.Platform, "platform", "", "platform version X.Y.Z the service must report: the API's own release version")
 	fs.StringVar(&want.Contract, "contract", "", "read-contract version major.minor the service must report")
 	if err := fs.Parse(args); err != nil {
 		return 2

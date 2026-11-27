@@ -31,7 +31,7 @@ func Probe(ctx context.Context, cfg *config.Config) error {
 // Versions is what a deployment expects the running service to report.
 // An empty field is not compared.
 type Versions struct {
-	Platform string // the platform release, X.Y.Z
+	Platform string // the platform version, which is the API's release version X.Y.Z
 	Contract string // the read-contract version, major.minor
 }
 

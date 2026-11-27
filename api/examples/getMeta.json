@@ -8,7 +8,7 @@
       "apiVersion": "1.0.0-example",
       "buildSha": "0123456789ab",
       "contractVersion": "0.3",
-      "platformVersion": null,
+      "platformVersion": "1.0.0-example",
       "openapi": "https://api.viafrei.de/v1/openapi.json",
       "languages": [
         "en"

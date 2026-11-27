@@ -6830,6 +6830,10 @@
           "value": "osm"
         },
         {
+          "name": "data.osmFuel",
+          "value": "[]"
+        },
+        {
           "name": "data.osmParking",
           "value": "[]"
         },

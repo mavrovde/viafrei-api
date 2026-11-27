@@ -5441,6 +5441,13 @@
             },
             "type": "array"
           },
+          "osmFuel": {
+            "description": "With fuel: OpenStreetMap's filling stations (ODbL) in the radius with no station we hold within 300 m, so no price yet, nearest first, three at most, as listFuelOptions' osmWithoutPrice; empty when there are none or the key may not read OpenStreetMap's places. Credited in meta.attribution.",
+            "items": {
+              "$ref": "#/components/schemas/OSMFuelStation"
+            },
+            "type": "array"
+          },
           "osmParking": {
             "description": "OpenStreetMap's car parks (ODbL; no capacity, no occupancy) in the radius that are none of the parking sites, nearest first, same-named ones as one, three at most; with parking, when the key may read OpenStreetMap.",
             "items": {

@@ -4,6 +4,7 @@ package health
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/service"
@@ -68,4 +69,45 @@ func ExpectedVersion(configured, builtin string) (service.ContractVersion, error
 		configured = builtin
 	}
 	return service.ParseContractVersion(configured)
+}
+
+// Prober is what Memo memoises: a readiness check.
+type Prober interface {
+	Check(ctx context.Context) Result
+}
+
+// Memo answers readiness from one check per ttl (#155): readiness is
+// served on the public listener without a per-address budget, so however
+// many calls arrive, an instance reads storage for it at most once per
+// ttl. Calls that arrive while a check runs wait for that check and take
+// its result (one flight); the check runs without the caller's
+// cancellation, so one caller that gives up never fails the others, and is
+// bounded by the checker's own timeout.
+type Memo struct {
+	probe Prober
+	ttl   time.Duration
+	now   func() time.Time
+
+	mu   sync.Mutex
+	at   time.Time
+	last Result
+	held bool
+}
+
+// Memoise returns probe's result memoised for ttl on the clock now.
+func Memoise(probe Prober, ttl time.Duration, now func() time.Time) *Memo {
+	return &Memo{probe: probe, ttl: ttl, now: now}
+}
+
+// Check returns the memoised result while it is younger than ttl, else
+// checks once more.
+func (m *Memo) Check(ctx context.Context) Result {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.held && m.now().Sub(m.at) < m.ttl {
+		return m.last
+	}
+	m.last = m.probe.Check(context.WithoutCancel(ctx))
+	m.at, m.held = m.now(), true
+	return m.last
 }

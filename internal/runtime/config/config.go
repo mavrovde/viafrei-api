@@ -128,9 +128,10 @@ type Contract struct {
 
 // Health holds the probe settings.
 type Health struct {
-	ListenAddr   string        `koanf:"listen_addr" default:"localhost:8082" validate:"required,hostname_port" desc:"Address of the health listener, host:port: liveness (/healthz), readiness (/readyz) and the service metadata (/v1/meta), and nothing else. The edge never routes it, so the platform probes the service without being on callers.allow_cidr. Its port differs from server.listen_addr's."`
-	ReadyTimeout time.Duration `koanf:"ready_timeout" default:"500ms" validate:"min=50ms,max=2s" desc:"Time the readiness probe gives storage to answer. At most deadline.request."`
-	ProbeTimeout time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck and meta-check subcommands wait for the health listener."`
+	ListenAddr    string        `koanf:"listen_addr" default:"localhost:8082" validate:"required,hostname_port" desc:"Address of the health listener, host:port: liveness (/healthz), readiness (/readyz) and the service metadata (/v1/meta), and nothing else. The edge never routes it, so the platform probes the service without being on callers.allow_cidr. Its port differs from server.listen_addr's."`
+	ReadyTimeout  time.Duration `koanf:"ready_timeout" default:"500ms" validate:"min=50ms,max=2s" desc:"Time the readiness probe gives storage to answer. At most deadline.request."`
+	ReadyCacheTTL time.Duration `koanf:"ready_cache_ttl" default:"1s" validate:"min=100ms,max=30s" desc:"How long one readiness check answers every readiness call of this instance: readiness is served without a per-address budget, so storage is read for it at most once per this interval, whatever the number of calls."`
+	ProbeTimeout  time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck and meta-check subcommands wait for the health listener."`
 }
 
 // Log holds the logging settings.

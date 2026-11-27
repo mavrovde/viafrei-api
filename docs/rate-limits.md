@@ -28,8 +28,11 @@ The gate is decided per operation. The service operations (`/healthz`,
 `/readyz`, `/v1/meta` and `/v1/pressure`, on the public listener and on
 the health listener) are outside it: an uptime monitor, a load balancer or
 a deploy script asking them from one address is never refused, and their
-documents name no 429. Readiness still reads storage through the
-admission gate, so it is bounded by the storage permits, not by address.
+documents name no 429. What bounds readiness is its memo: one check
+answers every readiness call of an instance for `health.ready_cache_ttl`
+(default 1 s), and calls that arrive while it runs wait for it, so however
+many calls arrive, an instance reads storage for readiness at most once
+per interval.
 The gate charges every request to a keyed operation that presents neither
 `Authorization` nor `X-API-Key` (SEC-051). A request that presents a key
 where no key is checked (an unknown path, a method its path does not

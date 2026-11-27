@@ -3,6 +3,8 @@ package health_test
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -76,5 +78,59 @@ func TestExpectedVersion(t *testing.T) {
 	}
 	if v, err := health.ExpectedVersion("0.3", "0.1"); err != nil || v.Minor != 3 {
 		t.Fatalf("configured contract.expected ignored: %v %v", v, err)
+	}
+}
+
+// countingReader answers the contract version after delay and counts the
+// reads.
+type countingReader struct {
+	reads atomic.Int64
+	delay time.Duration
+}
+
+func (c *countingReader) ContractVersion(ctx context.Context) (string, error) {
+	c.reads.Add(1)
+	time.Sleep(c.delay)
+	return "0.1", ctx.Err()
+}
+
+// Any number of readiness calls, at once and one after another, read
+// storage once per ttl (#155); one caller giving up fails no one.
+func TestReadinessReadsStorageOncePerInterval(t *testing.T) {
+	req.Covers(t, "FR-SVC-004")
+	r := &countingReader{delay: 20 * time.Millisecond}
+	var mu sync.Mutex
+	at := time.Unix(0, 0)
+	now := func() time.Time { mu.Lock(); defer mu.Unlock(); return at }
+	m := health.Memoise(health.NewChecker(r, want, time.Second), time.Second, now)
+	// The first caller has given up already: the check it starts still
+	// answers every other caller.
+	gone, cancel := context.WithCancel(context.Background())
+	cancel()
+	m.Check(gone)
+	var wg sync.WaitGroup
+	for range 50 {
+		wg.Go(func() {
+			if !m.Check(context.Background()).Ready {
+				t.Error("a concurrent call is not ready")
+			}
+		})
+	}
+	wg.Wait()
+	for range 50 {
+		if !m.Check(context.Background()).Ready {
+			t.Fatal("a sequential call is not ready")
+		}
+	}
+	if n := r.reads.Load(); n != 1 {
+		t.Fatalf("%d storage reads inside the interval, want 1", n)
+	}
+	mu.Lock()
+	at = at.Add(time.Second)
+	mu.Unlock()
+	m.Check(context.Background())
+	m.Check(context.Background())
+	if n := r.reads.Load(); n != 2 {
+		t.Fatalf("%d storage reads after the interval, want 2", n)
 	}
 }

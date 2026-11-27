@@ -9,6 +9,20 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.1.0](https://github.com/mavrovde/viafrei-api/compare/v2.0.7...v2.1.0) (2026-11-27)
+
+
+### Added
+
+* **places:** a city district answers as a locality of its municipality, with partOf, its Kreis and population; its kind changes from municipality to locality, so a kind=municipality filter no longer returns city districts ([#307](https://github.com/mavrovde/viafrei-api/issues/307)) ([e7a8d93](https://github.com/mavrovde/viafrei-api/commit/e7a8d93f6958fa73a25890369cc471d887ab5e82))
+
+
+### Fixed
+
+* **pois:** around a position the POI search lists the nearest first; without one it keeps the name order ([#309](https://github.com/mavrovde/viafrei-api/issues/309)) ([e7a8d93](https://github.com/mavrovde/viafrei-api/commit/e7a8d93f6958fa73a25890369cc471d887ab5e82))
+* **release:** the notes say Breaking API changes only when oasdiff reports one; an empty or unreadable result fails ([#310](https://github.com/mavrovde/viafrei-api/issues/310)) ([e7a8d93](https://github.com/mavrovde/viafrei-api/commit/e7a8d93f6958fa73a25890369cc471d887ab5e82))
+* **roads:** the lamp counts an Autobahn closure only while it is in force; a ramp-only closure gives amber ([#304](https://github.com/mavrovde/viafrei-api/issues/304)) ([e7a8d93](https://github.com/mavrovde/viafrei-api/commit/e7a8d93f6958fa73a25890369cc471d887ab5e82))
+
 ## [2.0.7](https://github.com/mavrovde/viafrei-api/compare/v2.0.6...v2.0.7) (2026-11-27)
 
 

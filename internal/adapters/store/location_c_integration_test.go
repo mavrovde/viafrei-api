@@ -103,8 +103,9 @@ var areaNames = []string{"schleswig-holstein", "hamburg", "niedersachsen", "brem
 // abroad are read from them (#299): inside an area it is in Germany, its
 // Land the area's; outside every area it may lie abroad, its Land the one
 // whose area is nearest (not whose point is), stated at the area's
-// distance, none beyond the reach; an area held under a name that is no
-// Land's is refused, never guessed.
+// distance, none beyond the reach; a point on an area's edge or corner is
+// inside. That every name an area may be held under is a Land's is
+// TestEveryLandAreaNameIsALands.
 func TestTheLandAndAbroadAreReadFromTheLandAreas(t *testing.T) {
 	var key string
 	if !fixtureRow(t, `select admin_code from public.gazetteer_places where kind = 'admin' and length(admin_code) = 2 and closed_at is null
@@ -135,6 +136,14 @@ func TestTheLandAndAbroadAreReadFromTheLandAreas(t *testing.T) {
 	if in.MayLieAbroad || in.AbroadFamily != "" || in.State == nil || in.State.OfficialKey == nil || *in.State.OfficialKey != key ||
 		*in.State.DistanceM != 0 || in.StateArea != "osm" {
 		t.Errorf("inside: %+v %+v", in, in.State)
+	}
+	// On the near box's corner and on its west edge: covered, not contained.
+	for _, p := range []geo.Point{{Lat: 74.7, Lon: -19.7}, {Lat: 74.5, Lon: -19.7}} {
+		l, err := st.Location(bounded(t), places.LocationQuery{At: p}, fams)
+		if err != nil || l.MayLieAbroad || l.AbroadFamily != "" || l.State == nil || l.State.OfficialKey == nil || *l.State.OfficialKey != key ||
+			l.State.DistanceM == nil || *l.State.DistanceM != 0 {
+			t.Errorf("on the edge at %+v: %+v %+v %v", p, l, l.State, err)
+		}
 	}
 	// 0.1 degree north of the near box's edge, about 11 km; the other's is 0.7.
 	out := at(74.8)

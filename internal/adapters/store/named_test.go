@@ -312,3 +312,13 @@ func TestStatementCacheCoversEveryStatement(t *testing.T) {
 		t.Errorf("db.statement_cache_capacity %d for %d statements", cfg.DB.StatementCacheCapacity, n)
 	}
 }
+
+// TestAMotorwayRowThatCannotBeScannedFailsTheList: the motorway list answers
+// the scan's error, with no roads and no families counted.
+func TestAMotorwayRowThatCannotBeScannedFailsTheList(t *testing.T) {
+	want := errors.New("cannot scan")
+	ms, counted, err := collectMotorways(someRows{failedRows{err: want}}, nil)
+	if !errors.Is(err, want) || ms != nil || counted != nil {
+		t.Fatalf("collectMotorways = %v, %v, %v; want the scan's error alone", ms, counted, err)
+	}
+}

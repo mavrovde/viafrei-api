@@ -17,6 +17,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
@@ -230,6 +231,35 @@ func TestMotorwaysCountTheFamiliesOfEveryRoad(t *testing.T) {
 		if !slices.Equal(counted, want) {
 			t.Errorf("%+v: %d roads, families counted %q, want %q", q, len(ms), counted, want)
 		}
+	}
+	// A situation in force on a road the register does not hold, of a
+	// family no register road carries (its other situations are withdrawn),
+	// is counted by neither statement.
+	var lone string
+	owner(t, `select source_ref from contract.traffic_event where event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`, &lone)
+	planted, pdb := private(t, `insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, headline, source_ref,
+    origin_key, published_at, recorded_at, changed_at)
+  select '`+fixtures.PlantedEvent("ev-off-register")+`', 'jam', 'A9999', 'motorway', e.location, now() - interval '1 hour', 'AbnormalTraffic', e.source_ref,
+    'ev-off-register', now(), now(), now()
+  from contract.traffic_event e
+  where e.event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`,
+		`update public.road_events set closed_at = now() - interval '2 hours' where feed_key = '`+lone+`' and road_number is distinct from 'A9999'`)
+	pc, err := pgx.Connect(ctx, pdb.ReaderURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = pc.Close(context.WithoutCancel(ctx)) }()
+	off := append(slices.Clone(fams), lone)
+	var inForce int
+	if err := pc.QueryRow(ctx, `select count(*) from contract.traffic_event where source_ref = '`+lone+`'
+	   and road_ref = 'A9999' and withdrawn_at is null and valid_from <= $1 and (valid_to is null or valid_to > $1)`, now).Scan(&inForce); err != nil || inForce != 1 {
+		t.Fatalf("the planted situation is not in force: %d, %v", inForce, err)
+	}
+	if err := pc.QueryRow(ctx, store.LegacyMotorwayFamilies(), off, now).Scan(&want); err != nil {
+		t.Fatal(err)
+	}
+	if _, counted, err := planted.Motorways(ctx, roads.CatalogueQuery{Limit: 500}, off, now); err != nil || slices.Contains(counted, lone) || !slices.Equal(counted, want) {
+		t.Fatalf("off the register: families counted %q, want %q (%v)", counted, want, err)
 	}
 	// No family asked: none is counted, and the roads are still listed.
 	ms, counted, err := st.Motorways(ctx, roads.CatalogueQuery{Limit: 500}, nil, now)

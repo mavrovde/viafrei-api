@@ -139,8 +139,18 @@ func TestAValidKeyOnAnUnknownPathCountsAgainstTheKey(t *testing.T) {
 		if w.Header().Get("RateLimit") == "" || w.Header().Get("RateLimit-Policy") == "" {
 			t.Errorf("%s: no RateLimit fields: %v", tc.name, w.Header())
 		}
-		if raw(h, http.MethodPut, "/v1/germany", bearer).Code == http.StatusTooManyRequests && tc.v.Refused == "" {
-			t.Errorf("%s: a 405 with a valid key refused", tc.name)
+		// A burst of 405s with the key: each counts against the key, none
+		// against the address, and each is the key's answer.
+		status, slug := http.StatusMethodNotAllowed, "method-not-allowed"
+		if tc.v.Refused != "" {
+			status, slug = tc.status, tc.slug
+		}
+		for i := range 8 {
+			w := raw(h, http.MethodPut, "/v1/germany", bearer)
+			assertProblem(t, w, status, slug)
+			if gate.charged != i+2 || addresses.charged != 0 || strings.Contains(w.Body.String(), "without a key") {
+				t.Errorf("%s: 405 %d: key charged %d, address %d", tc.name, i, gate.charged, addresses.charged)
+			}
 		}
 	}
 }

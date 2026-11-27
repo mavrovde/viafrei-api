@@ -151,7 +151,8 @@ func TestTheLampsReferenceMovesWithWhatAJunctionsStateIsDerivedFrom(t *testing.T
 // register publishes it, like a board's figures: a key given the published
 // family is answered with them (they were stamped with the licence's id, a
 // family no key holds where the source owns its licence's row, and never
-// served). The area's punctuality waits for the database (punctualityFamily).
+// served). So is the area's punctuality (#222): stamped with the licence's
+// id, no area was ever answered with it.
 func TestAnAreasTripDelaysAreReadUnderThePublishedFamily(t *testing.T) {
 	const area = "09162"
 	st, _ := private(t, append([]string{
@@ -182,6 +183,15 @@ func TestAnAreasTripDelaysAreReadUnderThePublishedFamily(t *testing.T) {
 	}
 	if d.Trips == nil || d.Trips.Observed != 2 || d.Trips.Late != 1 || d.Trips.Family != "tripupdates" {
 		t.Errorf("trips %+v, want 2 observed, 1 late, of tripupdates", d.Trips)
+	}
+	// The punctuality of the area's Land: its row counts the planted trips
+	// (and any another test planted in the Land within the half hour).
+	d, err = st.Disruptions(bounded(t), transit.DisruptionQuery{Area: "09", Limit: 5, Now: time.Now()}, fams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := d.Punctuality; p == nil || p.AreaCode != "09" || p.TripsObserved < 2 || p.TripsLate < 1 || p.Family != "tripupdates" || !slices.Equal(d.PunctualityRead, []string{"tripupdates"}) {
+		t.Errorf("punctuality %+v, read %v; want the Land's row, of tripupdates", p, d.PunctualityRead)
 	}
 }
 

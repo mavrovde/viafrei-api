@@ -1,5 +1,7 @@
-# Parity bundles pinned per platform version: platform, bundle, sha256.
-# Pinned by the version sync; see docs/parity.md.
+# Parity bundles pinned per MCP platform version they were answered at:
+# platform, bundle, sha256. The parity run compares the newest X.Y.Z line
+# (parity.Newest); unsynced is the API's own recording, the regression lock.
+# See docs/parity.md.
 # 2.5.23 and 2.5.24 were answered from producer commits made after those
 # versions' tags (each named in its bundle's commit): records only, not
 # parity evidence. 2.6.8, 2.6.12, 2.6.13 and 2.6.18 were answered at their tags' commits.
@@ -19,4 +21,4 @@
 2.6.22	bundles/2.6.22.json	327b645368a3fd31148b639c13a4ef64fb4aaf51a29a3dc907906d2b84b6628a
 2.6.52	bundles/2.6.52.json	04a20c695d96c7b70cfb2f57a25c0b12176ae2d415287edba6456e2d69f53a2a
 2.6.54	bundles/2.6.54.json	181f8df19da496ce65b6aba02ad5c86acb2ed948c848eccf94433bc42a1eef25
-unsynced	bundles/unsynced.json	e24e840d4ffb8f5eb629f11ed71d277358e0e6f01781bb17e6229825ad455926
+unsynced	bundles/unsynced.json	75f4bb55b9c0826af79de0c4ad327eeaaf63ce18e3eb8eafb6e96721993fa3d6

@@ -115,6 +115,30 @@ limit 1`, "float8", "float8", "text[]")
 // first.
 const nearestWindow = "100"
 
+// nearestLandArea reads the Land area of the families $3 nearest ($1, $2):
+// the name it is held under, its family, whether it covers the position (a
+// point on its border included) and the stated distance to it on the
+// sphere. The areas' GiST finds the nearest parts on the plane; of those
+// the nearest on the sphere is taken, a tie broken by the name. No row when
+// no Land area is held.
+//
+//nolint:misspell // materialized is the SQL keyword
+var nearestLandArea = named("api_location_land_area", `
+with c as materialized (
+  select b.land, b.source_id, b.geom
+  from osm_boundary_de b
+  where b.source_id = any((select $3::text[])::text[])
+  order by b.geom <-> st_setsrid(st_makepoint((select $1::float8), (select $2::float8)), 4326)
+  limit `+landAreaWindow+`)
+select c.land, c.source_id, st_covers(c.geom, st_setsrid(st_makepoint((select $1::float8), (select $2::float8)), 4326)), `+statedM("c.geom")+`
+from c
+order by st_distance(c.geom::geography, `+atPosition+`, false), c.land
+limit 1`, "float8", "float8", "text[]")
+
+// landAreaWindow is how many of the Land areas' parts nearest on the plane
+// nearestLandArea measures on the sphere.
+const landAreaWindow = "8"
+
 // stateOf reads the Land whose key is the first two digits of the region
 // code $1, of the families $2: the open gazetteer row of kind admin keyed by
 // those two digits, never a Regierungsbezirk (a three-digit key under it),
@@ -206,16 +230,31 @@ func locationFacts(ctx context.Context, tx pgx.Tx, q places.LocationQuery, famil
 		}
 		*k.into = first(ps)
 	}
-	if out.District != nil && out.District.RegionCode != nil {
-		rows, _ = run(ctx, tx, stateOf, *out.District.RegionCode, families)
-	} else {
-		rows, _ = run(ctx, tx, nearestPlace, q.At.Lon, q.At.Lat, "state", places.StateReachM, families)
-	}
-	ps, err := pgx.CollectRows(rows, scanPlace)
+	rows, _ = run(ctx, tx, nearestLandArea, q.At.Lon, q.At.Lat, families)
+	areas, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.LandArea, error) {
+		var v places.LandArea
+		err := r.Scan(&v.Name, &v.Family, &v.Covers, &v.DistanceM)
+		return v, err
+	})
 	if err != nil {
 		return out, err
 	}
-	out.State = first(ps)
+	area := first(areas)
+	if out.State, err = stateAt(ctx, tx, q, out.District, area, families); err != nil {
+		return out, err
+	}
+	if out.State != nil && out.State.DistanceM != nil && area != nil {
+		out.StateArea = area.Family
+	}
+	// A Land area held decides whether the position lies in Germany: an
+	// address read beyond the border (the extracts reach into Basel) is no
+	// sign that it does (#299).
+	if area != nil {
+		if !area.Covers {
+			out.MayLieAbroad, out.AbroadFamily = true, area.Family
+		}
+		return out, nil
+	}
 	if out.Address != nil && *out.Address.DistanceM <= places.AbroadNearestM {
 		return out, nil
 	}
@@ -238,6 +277,33 @@ func locationFacts(ctx context.Context, tx pgx.Tx, q places.LocationQuery, famil
 		out.AbroadFamily = *v
 	}
 	return out, err
+}
+
+// stateAt reads the Land of a position: the district's, else the Land
+// whose area is nearest within StateReachM, stated at the area's distance
+// (the nearest Land's point named Bremen for the North Sea, #299), else,
+// with no Land area held, the Land whose point is nearest.
+func stateAt(ctx context.Context, tx pgx.Tx, q places.LocationQuery, district *places.Place, area *places.LandArea, families []string) (*places.Place, error) {
+	var rows pgx.Rows
+	switch {
+	case district != nil && district.RegionCode != nil:
+		rows, _ = run(ctx, tx, stateOf, *district.RegionCode, families)
+	case area == nil:
+		rows, _ = run(ctx, tx, nearestPlace, q.At.Lon, q.At.Lat, "state", places.StateReachM, families)
+	case area.DistanceM > places.StateReachM:
+		return nil, nil
+	default:
+		// The table's check admits the sixteen names alone, each a Land's
+		// (TestEveryLandAreaNameIsALands).
+		key, _ := places.LandOfArea(area.Name)
+		rows, _ = run(ctx, tx, stateOf, key, families)
+	}
+	ps, err := pgx.CollectRows(rows, scanPlace)
+	state := first(ps)
+	if state != nil && area != nil && (district == nil || district.RegionCode == nil) {
+		state.DistanceM = &area.DistanceM
+	}
+	return state, err
 }
 
 // gemeindeAt reads the Gemeinde the position ($2, $3) lies in, as today's

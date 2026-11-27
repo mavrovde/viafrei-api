@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -95,7 +96,7 @@ func TestTrainBoardCarriesTheStoredBoardsCapAndInterchange(t *testing.T) {
 			Lines: []transit.LineGroup{{Modes: []string{"subway"}, Lines: []string{"U4"}}}},
 		Meta: features.Answer[struct{}]{Families: []provenance.Family{transitFamily}, At: read}}
 	h := featureHandler(t, config.Defaults(), f, nil)
-	w := do(t, h, http.MethodGet, "/v1/train-boards/8000105?limit=1&duration_min=90", bearer)
+	w := do(t, h, http.MethodGet, "/v1/train-boards/8000105?limit=1&duration_min=90&categories=ICE,S", bearer)
 	body := w.Body.String()
 	for _, want := range []string{`"evaNumbers":["8000105","8098105"]`, `"degraded":true`, `"stationPart":"Frankfurt (Main) Hbf (tief)"`, `"capped":{"more":9,`,
 		`"interchange":{"departures":[{"mode":"subway"`, `"mode":"tram"`, `"expectedAt":null`, `"lines":[{"modes":["subway"],"lines":["U4"]}]`, `"ageSeconds":240`} {
@@ -103,7 +104,7 @@ func TestTrainBoardCarriesTheStoredBoardsCapAndInterchange(t *testing.T) {
 			t.Errorf("lacks %s: %s", want, body)
 		}
 	}
-	if w.Code != 200 || f.gotTrainBoard.Limit != 1 || f.gotTrainBoard.DurationMin != 90 {
+	if w.Code != 200 || f.gotTrainBoard.Limit != 1 || f.gotTrainBoard.DurationMin != 90 || !slices.Equal(f.gotTrainBoard.Categories, []string{"ICE", "S"}) {
 		t.Errorf("%d asked %+v", w.Code, f.gotTrainBoard)
 	}
 	f.trainBoard = features.TrainBoardAnswer{}

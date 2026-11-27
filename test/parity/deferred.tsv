@@ -7,6 +7,7 @@
 D	getStationPage	*	data.sections[departures]	the question's key reads no DB Timetables, so the API withholds DB's board; the API-only question station-page-db asks with the key, and the regression lock records ICE 571, RE 1 and S 3 as the platform lists them
 D	getStationPage	*	data.sections[rail_ampel]	the lamp judges the board the key may read: without DB Timetables there is no train to judge; with it the lamp is red, 1 of 3 cancelled, as the platform's
 D	getStationPage	missing	meta.attribution[db_timetables]	DB Timetables is credited where the key reads it
+D	listTransitDisruptions	missing	meta.attribution[delfi_rt_tu]	the fixture's register publishes the DELFI Trip Updates under the licence's id, the platform's under its source's key (tripupdates), which the API reads an area's punctuality under (#222); the question's key holds no tripupdates, so no punctuality is read or credited until the fixture's register is the platform's and the MCP side records again
 # C: correct extras the API states and credits.
 C	listSources	extra	data[*].staleAfterS	the register's stale threshold of a family
 C	getStationPage	extra	data.sections[lifts]	the page's lift section, as the site shows it

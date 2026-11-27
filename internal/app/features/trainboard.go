@@ -30,11 +30,13 @@ type TrainBoards interface {
 var ErrOwnKeyOnly = errors.New("features: only ViaFrei's own keys may call this operation")
 
 // TrainBoardQuery asks a station's board: its EVA number, how far ahead
-// (minutes) and how many departures.
+// (minutes), how many departures and, when any, the train categories to
+// keep (as the board writes them: ICE, IC, RE, RB, S).
 type TrainBoardQuery struct {
 	EVA         string
 	DurationMin int
 	Limit       int
+	Categories  []string
 }
 
 // TrainBoardAnswer is a station's board while one is fresh: Board is the
@@ -72,6 +74,13 @@ func (s *Service) TrainBoard(ctx context.Context, key access.Record, q TrainBoar
 		evas := []string{q.EVA}
 		if b != nil {
 			contributed = fams
+			if len(q.Categories) > 0 {
+				// The categories are kept before the limit, so a board of
+				// many trains still shows the asked ones (#298).
+				b.Departures = slices.DeleteFunc(slices.Clone(b.Departures), func(d transit.TrainDeparture) bool {
+					return d.Category == nil || !slices.Contains(q.Categories, *d.Category)
+				})
+			}
 			b.Departures, out.Cap = transit.BoardWindow(*b, now, q.DurationMin, q.Limit)
 			out.Board = b
 			if len(b.EVAs) > 0 {

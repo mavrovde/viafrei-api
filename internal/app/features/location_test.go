@@ -87,6 +87,12 @@ func TestLocation(t *testing.T) {
 	if err != nil || len(a.Meta.Families) != 2 {
 		t.Errorf("abroad %+v %v", a.Meta.Families, err)
 	}
+	// A Land chosen by its area credits the area's family (#299).
+	byArea := places.Location{State: &places.Place{Family: "f1"}, StateArea: "f2"}
+	a, err = locationService(&locationFake{v: byArea}).Location(context.Background(), key("consumer", []access.Scope{"places"}, "f1", "f2"), places.LocationQuery{})
+	if err != nil || !slices.Equal(names(a.Meta.Families), []string{"f1", "f2"}) {
+		t.Errorf("by area %+v %v", a.Meta.Families, err)
+	}
 	// The nearest junction is read of the places and the roads families and
 	// credits its node's family and its road's.
 	jf := &locationFake{roads: true, v: places.Location{Junction: &places.Junction{Family: "f1", RoadBy: "z1"}}}

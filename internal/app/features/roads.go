@@ -230,7 +230,8 @@ func warningLevels(p roads.Page) []int {
 // (FR-ROAD-003, FR-ROAD-004). The road is resolved first. A motorway the
 // register does not hold is unknown (roads.ErrUnknownRoad), as the
 // platform's roadworks-ahead answer refuses it (G6), unless q.AnyMotorway
-// (a watch) reads it as any other unheld road. Any other road it does
+// (a watch) reads it as any other unheld road. q.SituationsOnly (a watch)
+// reads no motorway answer and no road status. Any other road it does
 // not hold (a federal, Land or city road) is answered as that answer answers
 // it: from the situations whose reference names it, with the families that
 // hold any situation on a road of its class (Covering), and crediting only
@@ -252,12 +253,21 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	c.Road = &road
+	if q.SituationsOnly {
+		return unregistered(c, q), nil
+	}
 	if err := s.motorway(ctx, &c, q); err != nil {
 		return Conditions{}, err
 	}
 	if err := s.roadStatus(ctx, key, &c, q); err != nil {
 		return Conditions{}, err
 	}
+	return unregistered(c, q), nil
+}
+
+// unregistered completes the answer of a road the register does not hold:
+// the families covering its class, and none credited when it lists none.
+func unregistered(c Conditions, q roads.CorridorQuery) Conditions {
 	if q.Unregistered {
 		if c.Covering == nil {
 			c.Covering = []string{}
@@ -266,7 +276,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 			c.Families = nil
 		}
 	}
-	return c, nil
+	return c
 }
 
 // motorway adds the platform's motorway answer to c: a registered

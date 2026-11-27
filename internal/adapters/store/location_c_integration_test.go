@@ -3,6 +3,8 @@
 package store_test
 
 import (
+	"fmt"
+	"regexp"
 	"slices"
 	"testing"
 	"time"
@@ -83,5 +85,96 @@ func TestSituationReadsByID(t *testing.T) {
 	got, err := seeded(t).Situation(bounded(t), id, every(t), time.Unix(0, 0))
 	if err != nil || got.ID != id {
 		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+// landArea plants a Land area held under name: a box of 0.4 degrees of
+// latitude and longitude around (lon, lat), of the family osm.
+func landArea(name string, id int, lon, lat float64) string {
+	return fmt.Sprintf(`insert into public.osm_boundary_de (land, osm_id, osm_version, part, geom, source_id, extract_date)
+	 values ('%s', %d, 1, 1, st_makeenvelope(%f, %f, %f, %f, 4326), 'osm', current_date)`, name, id, lon-0.2, lat-0.2, lon+0.2, lat+0.2)
+}
+
+// areaNames are the names Germany's Land areas are held under.
+var areaNames = []string{"schleswig-holstein", "hamburg", "niedersachsen", "bremen", "nordrhein-westfalen", "hessen", "rheinland-pfalz",
+	"baden-wuerttemberg", "bayern", "saarland", "berlin", "brandenburg", "mecklenburg-vorpommern", "sachsen", "sachsen-anhalt", "thueringen"}
+
+// With the Land areas held, a position's Land and whether it may lie
+// abroad are read from them (#299): inside an area it is in Germany, its
+// Land the area's; outside every area it may lie abroad, its Land the one
+// whose area is nearest (not whose point is), stated at the area's
+// distance, none beyond the reach; a point on an area's edge or corner is
+// inside. That every name an area may be held under is a Land's is
+// TestEveryLandAreaNameIsALands.
+func TestTheLandAndAbroadAreReadFromTheLandAreas(t *testing.T) {
+	var key string
+	if !fixtureRow(t, `select admin_code from public.gazetteer_places where kind = 'admin' and length(admin_code) = 2 and closed_at is null
+		order by admin_code limit 1`, &key) {
+		t.Fatal("the fixtures hold no Land")
+	}
+	name, other := "", ""
+	for _, n := range areaNames {
+		switch k, _ := places.LandOfArea(n); {
+		case k == key:
+			name = n
+		case other == "":
+			other = n
+		}
+	}
+	// The near Land's box (74.3 to 74.7 north) and another's farther north.
+	st, _ := private(t, landArea(name, 990101, -19.5, 74.5), landArea(other, 990102, -19.5, 75.7))
+	fams := every(t)
+	at := func(lat float64) places.Location {
+		t.Helper()
+		l, err := st.Location(bounded(t), places.LocationQuery{At: geo.Point{Lat: lat, Lon: -19.5}}, fams)
+		if err != nil {
+			t.Fatalf("%v: %v", lat, err)
+		}
+		return l
+	}
+	in := at(74.5)
+	if in.MayLieAbroad || in.AbroadFamily != "" || in.State == nil || in.State.OfficialKey == nil || *in.State.OfficialKey != key ||
+		*in.State.DistanceM != 0 || in.StateArea != "osm" {
+		t.Errorf("inside: %+v %+v", in, in.State)
+	}
+	// On the near box's corner and on its west edge: covered, not contained.
+	for _, p := range []geo.Point{{Lat: 74.7, Lon: -19.7}, {Lat: 74.5, Lon: -19.7}} {
+		l, err := st.Location(bounded(t), places.LocationQuery{At: p}, fams)
+		if err != nil || l.MayLieAbroad || l.AbroadFamily != "" || l.State == nil || l.State.OfficialKey == nil || *l.State.OfficialKey != key ||
+			l.State.DistanceM == nil || *l.State.DistanceM != 0 {
+			t.Errorf("on the edge at %+v: %+v %+v %v", p, l, l.State, err)
+		}
+	}
+	// 0.1 degree north of the near box's edge, about 11 km; the other's is 0.7.
+	out := at(74.8)
+	if !out.MayLieAbroad || out.AbroadFamily != "osm" || out.State == nil || *out.State.OfficialKey != key ||
+		*out.State.DistanceM < 11000 || *out.State.DistanceM > 11300 || out.StateArea != "osm" {
+		t.Errorf("outside: %+v %+v", out, out.State)
+	}
+	// Beyond the reach of either area: abroad, and no Land.
+	if far := at(78.5); !far.MayLieAbroad || far.State != nil || far.StateArea != "" {
+		t.Errorf("far: %+v", far)
+	}
+}
+
+// Every name the Land areas' table admits (its check, read from the
+// schema, not the rows) is a Land's, and each Land's name is admitted.
+func TestEveryLandAreaNameIsALands(t *testing.T) {
+	var check string
+	if !fixtureRow(t, `select pg_get_constraintdef(c.oid) from pg_constraint c
+		where c.conrelid = 'public.osm_boundary_de'::regclass and c.conname = 'osm_boundary_de_land_known'`, &check) {
+		t.Fatal("the Land areas' table has no check of its names")
+	}
+	admitted := regexp.MustCompile(`'([a-z-]+)'::text`).FindAllStringSubmatch(check, -1)
+	keys := map[string]bool{}
+	for _, m := range admitted {
+		k, ok := places.LandOfArea(m[1])
+		if !ok {
+			t.Errorf("the check admits %q, no Land's name", m[1])
+		}
+		keys[k] = true
+	}
+	if len(admitted) != len(areaNames) || len(keys) != 16 {
+		t.Errorf("the check admits %d names of %d Länder: %s", len(admitted), len(keys), check)
 	}
 }

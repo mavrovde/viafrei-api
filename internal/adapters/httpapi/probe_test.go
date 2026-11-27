@@ -65,12 +65,12 @@ func TestProbeVerdicts(t *testing.T) {
 }
 
 // The deployment check's half in the container: the running service's
-// /v1/meta compared with the platform release and schema it must match.
+// /v1/meta compared with the API release and read contract it must match.
 func TestCheckVersions(t *testing.T) {
 	req.Covers(t, "FR-SVC-003", "REL-001")
 	synced, err := httpapi.NewHealthHandler(httpapi.Deps{
 		Config:          config.Defaults(),
-		Build:           buildinfo.Info{Version: "2.5.21", Commit: "abc1234", Platform: "2.5.21"},
+		Build:           buildinfo.Info{Version: "2.5.21", Commit: "abc1234"},
 		ContractVersion: "0.1",
 		Now:             func() time.Time { return fixedNow },
 	})
@@ -79,8 +79,13 @@ func TestCheckVersions(t *testing.T) {
 	}
 	syncedSrv := httptest.NewServer(synced)
 	defer syncedSrv.Close()
-	unsyncedSrv := httptest.NewServer(newHealthHandler(t, config.Defaults(), nil))
-	defer unsyncedSrv.Close()
+	// A service before 2.0.7 could state platformVersion null; the type keeps
+	// null, so the check names it as such.
+	nullSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"platformVersion":null,"contractVersion":"0.1"}}`))
+	}))
+	defer nullSrv.Close()
 	ctx := context.Background()
 	for _, want := range []httpapi.Versions{{Platform: "2.5.21", Contract: "0.1"}, {Contract: "0.1"}, {}} {
 		if err := httpapi.CheckVersions(ctx, probeConfig(syncedSrv), want); err != nil {
@@ -94,7 +99,7 @@ func TestCheckVersions(t *testing.T) {
 	}{
 		"other platform": {syncedSrv, httpapi.Versions{Platform: "2.5.22"}, "platformVersion 2.5.21, want 2.5.22"},
 		"other contract": {syncedSrv, httpapi.Versions{Contract: "0.2"}, "contractVersion 0.1, want 0.2"},
-		"unsynced":       {unsyncedSrv, httpapi.Versions{Platform: "2.5.21", Contract: "1.0"}, "platformVersion null, want 2.5.21; contractVersion 0.1, want 1.0"},
+		"null platform":  {nullSrv, httpapi.Versions{Platform: "2.5.21", Contract: "1.0"}, "platformVersion null, want 2.5.21; contractVersion 0.1, want 1.0"},
 	}
 	for name, c := range mismatches {
 		err := httpapi.CheckVersions(ctx, probeConfig(c.srv), c.want)

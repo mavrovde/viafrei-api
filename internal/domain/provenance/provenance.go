@@ -137,12 +137,33 @@ func (f Family) TurnsStale() (time.Time, bool) {
 	return known.Add((f.StaleAfter/time.Second + 1) * time.Second), true
 }
 
-// AsOf is meta.asOf (ENV-004): the oldest instant among the entries, or nil
-// when there is no entry or one of them has no instant, since nothing is then
-// known about the oldest.
+// LiveWithinS is the longest design threshold of a live family, in seconds,
+// as the contract states it (ENV-004): three hours, a source read at least
+// hourly (the platform's threshold is three of its cadences). A family with
+// a longer threshold, or none, is a register: a load read daily or less
+// often (a charger or station register, the timetable, OpenStreetMap),
+// whose data is as current as its last load.
+const LiveWithinS = 10800
+
+// Live says whether the entry is of a live family (LiveWithinS).
+func (f Freshness) Live() bool {
+	return f.StaleAfterS != nil && *f.StaleAfterS <= LiveWithinS
+}
+
+// AsOf is meta.asOf (ENV-004): the oldest instant among the entries of the
+// live families, or among all entries when none is live, so a register's
+// load date never stands for an answer that carries live data (#297); nil
+// when there is no entry or one of those has no instant, since nothing is
+// then known about the oldest. Each family's own instant stays in its
+// entry. A source that publishes only changes counts by its last good
+// read, not its last change (Family.KnownCurrent).
 func AsOf(fs []Freshness) *time.Time {
+	live := slices.DeleteFunc(slices.Clone(fs), func(f Freshness) bool { return !f.Live() })
+	if len(live) == 0 {
+		live = fs
+	}
 	var oldest *time.Time
-	for _, f := range fs {
+	for _, f := range live {
 		if f.DataAsOf == nil {
 			return nil
 		}

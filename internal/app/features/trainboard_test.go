@@ -118,6 +118,19 @@ func TestTrainBoardServesTheStoredBoardWithoutARefresh(t *testing.T) {
 	if a, _ = s.TrainBoard(context.Background(), transitKey, features.TrainBoardQuery{EVA: "8000105", DurationMin: 60, Limit: 50}); a.Cap != nil || len(a.Board.Departures) != 8 {
 		t.Errorf("uncut %+v", a.Cap)
 	}
+	// The asked categories are kept before the limit (#298): of the eight,
+	// the one ICE after five others is shown, the board's own rows untouched.
+	ice, re := "ICE", "RE"
+	for i := range b.stored.Departures {
+		b.stored.Departures[i].Category = &re
+	}
+	b.stored.Departures[6].Category, b.stored.Departures[7].Category = &ice, nil
+	if a, _ = s.TrainBoard(context.Background(), transitKey, features.TrainBoardQuery{EVA: "8000105", DurationMin: 60, Limit: 5, Categories: []string{"ICE"}}); a.Cap != nil || len(a.Board.Departures) != 1 || *a.Board.Departures[0].Category != "ICE" {
+		t.Errorf("ICE only %+v %+v", a.Board, a.Cap)
+	}
+	if *b.stored.Departures[0].Category != "RE" || len(b.stored.Departures) != 8 {
+		t.Errorf("the stored board was changed: %+v", b.stored.Departures)
+	}
 	b.stored.ReadAt = now.Add(-transit.StoredBoardFreshFor - time.Second)
 	if a, _ = s.TrainBoard(context.Background(), transitKey, boardQ); a.Board != nil || a.AsOf == nil {
 		t.Errorf("stale stored: %+v", a)

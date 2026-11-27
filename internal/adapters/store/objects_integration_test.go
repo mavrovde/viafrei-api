@@ -88,6 +88,9 @@ func TestNationalReadsEveryDomainsPart(t *testing.T) {
 	ctx := access.WithAudience(bounded(t), access.AudienceOwn)
 	var fams []string
 	owner(t, `select array_agg(distinct source_ref order by source_ref) from contract.source`, &fams)
+	// The Trip Updates' figures are read under their source's key, the family
+	// the platform's register publishes them as (tripUpdatesOwnTheirLicence).
+	fams = append(fams, "tripupdates")
 	var newest time.Time
 	owner(t, `select max(observed_at) from contract.fuel_price_observation`, &newest)
 	at := newest.Add(time.Minute)

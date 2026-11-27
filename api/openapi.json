@@ -779,7 +779,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -1349,7 +1349,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -1593,7 +1593,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -2403,7 +2403,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -3654,7 +3654,7 @@
             ]
           },
           "mayLieOutsideGermany": {
-            "description": "True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself.",
+            "description": "True when the position may lie outside Germany, off the coast or across the border: no Land area covers it (a point on a border is inside). Where no Land area is held: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself.",
             "type": "boolean"
           },
           "municipality": {
@@ -3696,7 +3696,7 @@
           },
           "state": {
             "additionalProperties": false,
-            "description": "The Land of the district; with no district, the nearest Land within 250 km; null when none.",
+            "description": "The Land of the district; with no district, the Land whose area is nearest within 250 km, its distance that to the area (0 inside); null when none.",
             "properties": {
               "code": {
                 "description": "The official region code; null when none.",
@@ -4025,7 +4025,7 @@
             "type": "string"
           },
           "platformVersion": {
-            "description": "ViaFrei platform release this build is kept in step with (version sync); null before the first sync.",
+            "description": "ViaFrei platform version: the API's own release version, the value apiVersion states. The type stays nullable; this service always states it.",
             "type": [
               "string",
               "null"
@@ -4805,7 +4805,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -4897,7 +4897,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -5591,7 +5591,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -5938,7 +5938,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -6532,7 +6532,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -7141,7 +7141,7 @@
             ]
           },
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -7639,7 +7639,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -8078,7 +8078,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -8695,7 +8695,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -10469,7 +10469,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -10918,7 +10918,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -11885,7 +11885,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -16188,7 +16188,7 @@
     },
     "/v1/location": {
       "get": {
-        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places.",
+        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the Land whose area is nearest); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places.",
         "operationId": "describeLocation",
         "parameters": [
           {
@@ -16872,7 +16872,7 @@
     },
     "/v1/meta": {
       "get": {
-        "description": "The API version, the build revision, the read-contract version and the platform release the build is kept in step with.",
+        "description": "The API version, the build revision, the read-contract version and the platform version, which is the API's own release version.",
         "operationId": "getMeta",
         "responses": {
           "200": {
@@ -16886,7 +16886,7 @@
                         "apiVersion": "1.0.0-example",
                         "buildSha": "0123456789ab",
                         "contractVersion": "0.3",
-                        "platformVersion": null,
+                        "platformVersion": "1.0.0-example",
                         "openapi": "https://api.viafrei.de/v1/openapi.json",
                         "languages": [
                           "en"
@@ -27303,6 +27303,20 @@
               "maximum": 120,
               "minimum": 5,
               "type": "integer"
+            }
+          },
+          {
+            "description": "Keep only trains of these categories (comma-separated, as the board writes them: ICE, IC, RE, RB, S), before the limit is applied. Default: every departure.",
+            "explode": false,
+            "in": "query",
+            "name": "categories",
+            "schema": {
+              "description": "Keep only trains of these categories (comma-separated, as the board writes them: ICE, IC, RE, RB, S), before the limit is applied. Default: every departure.",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
             }
           },
           {

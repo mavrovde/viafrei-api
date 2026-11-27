@@ -183,18 +183,20 @@ breaking change on the release page even when the version rules allow it.
 
 ### The platform version in `/v1/meta`
 
-`/v1/meta` reports `platformVersion` from `internal/buildinfo/platform-version.txt`
-beside `apiVersion` and `contractVersion`. Nothing writes that file any more:
-the version sync that read the MCP server's release (`platform-sync.yml`,
-`internal/release/platformsync`) is removed, because the API does not read
-its consumers. The file keeps its last synced value until the contract
-decides what `platformVersion` means without the sync. A deployment checks
-the running service against a platform and read-contract version with a
-subcommand that needs no shell in the image:
+`/v1/meta` reports `platformVersion` beside `apiVersion` and
+`contractVersion`. The platform version is the API's own release version:
+`platformVersion` states the same value as `apiVersion`, the version the
+release workflow builds the image with. No file holds it and nothing syncs
+it; the field keeps its name and its nullable string type, and this service
+always states it (since 2.0.7; before, it was read from a file a version sync
+wrote). A deployment checks the running service against a version and a
+read-contract version with a subcommand that needs no shell in the image:
 
 ```sh
 viafrei-api meta-check -platform X.Y.Z -contract M.m   # 0 match, 1 mismatch (both values named), 2 unreadable
 ```
+
+`-platform` names the API release the deployment pins.
 
 ## Checklist for the release pull request
 

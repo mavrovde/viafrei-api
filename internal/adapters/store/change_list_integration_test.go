@@ -423,7 +423,7 @@ func TestAnAreasPunctualityIsItsLandsAlone(t *testing.T) {
 			t.Errorf("%s: the view has no row; the planted delays did not reach it", area)
 		}
 	}
-	d, err := st.Disruptions(bounded(t), transit.DisruptionQuery{Area: "09", Limit: 5, Now: time.Now()}, []string{"delfi_rt_tu"})
+	d, err := st.Disruptions(bounded(t), transit.DisruptionQuery{Area: "09", Limit: 5, Now: time.Now()}, []string{"tripupdates"})
 	if err != nil {
 		t.Fatal(err)
 	}

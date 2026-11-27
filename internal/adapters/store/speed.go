@@ -16,17 +16,15 @@ import (
 // on the camera's own geography.
 const speedNear = `st_dwithin(c.geom, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8)`
 
-// speedOfficialRows are the open cameras of the official lists (speed
-// enforcement, Hamburg's cameras), in one shape; speedOSMRows
-// OpenStreetMap's.
+// speedOfficialRows are the open cameras of the official lists of speed
+// enforcement, in one shape; speedOSMRows OpenStreetMap's. Hamburg's
+// traffic cameras (hh_cameras) are traffic-view webcams of the transport
+// authority, no enforcement point, and never read here (#301); the read
+// contract's view had listed them as fixed speed cameras.
 const speedOfficialRows = `(
   select 'se:' || s.id camera_id, s.kind, s.enforces, s.geom, s.max_speed_kmh, s.max_speed_hgv_kmh, s.direction, s.municipality name,
          s.street, s.location_text, s.ags admin_code, s.data_as_of, s.valid_from, s.valid_to, s.source_feed source_ref
-  from speed_enforcement s where s.closed_at is null
-  union all
-  select 'hh:' || h.camera_id, 'fixed', null, h.geom::geography, null, null, null, h.location_label, null, h.note, '02000000',
-         null, null, null, h.source_feed
-  from hh_cameras h where h.closed_at is null)`
+  from speed_enforcement s where s.closed_at is null)`
 
 const speedOSMRows = `(
   select 'osm:' || o.osm_type || o.osm_id camera_id, 'fixed' kind, o.enforces, o.geom, o.max_speed_kmh, null::smallint max_speed_hgv_kmh,

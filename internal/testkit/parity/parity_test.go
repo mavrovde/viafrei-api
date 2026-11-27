@@ -2,6 +2,7 @@ package parity_test
 
 import (
 	"errors"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -299,5 +300,49 @@ func TestAnAnswerWhoseEveryDataFactIsExcludedStatesEmptyData(t *testing.T) {
 	}
 	if !slices.IsSortedFunc(got, func(a, b parity.Fact) int { return strings.Compare(a.Name, b.Name) }) {
 		t.Errorf("the facts are not in name order: %+v", got)
+	}
+}
+
+// The parity run compares the newest pinned platform version, ordered by
+// number, not by text; the regression lock and other names are no version.
+func TestNewestIsTheHighestPinnedVersion(t *testing.T) {
+	lock := func(names ...string) fstest.MapFS {
+		var b strings.Builder
+		b.WriteString("# comment\n\n")
+		for _, n := range names {
+			b.WriteString(n + "\tb.json\tab\n")
+		}
+		return fstest.MapFS{parity.LockFile: {Data: []byte(b.String())}}
+	}
+	for want, names := range map[string][]string{
+		"2.6.54": {"2.5.23", "2.6.8", "2.6.54", "2.6.22", parity.RegressionLock},
+		"10.0.0": {"9.9.9", "10.0.0", "2.10.1"},
+		"1.2.3":  {"1.2.3"},
+	} {
+		if got, err := parity.Newest(lock(names...)); err != nil || got != want {
+			t.Errorf("Newest(%v) = %q, %v; want %q", names, got, err, want)
+		}
+	}
+	if _, err := parity.Newest(lock(parity.RegressionLock, "v1.2.3", "01.2.3")); !errors.Is(err, parity.ErrNotPinned) {
+		t.Errorf("a lock with no version: %v", err)
+	}
+	if _, err := parity.Newest(fstest.MapFS{parity.LockFile: {Data: []byte("1.2.3\tb.json\n")}}); !errors.Is(err, parity.ErrMalformed) {
+		t.Errorf("a malformed lock: %v", err)
+	}
+	if _, err := parity.Newest(fstest.MapFS{}); err == nil {
+		t.Error("no lock file read as a choice")
+	}
+}
+
+// The committed lock's newest pin is an MCP bundle: the parity run compares
+// the MCP side's facts, never the API's own recording.
+func TestTheCommittedNewestPinIsTheMCPSide(t *testing.T) {
+	fsys := os.DirFS("../../../test/parity")
+	name, err := parity.Newest(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, err := parity.Load(fsys, name); err != nil || b.Producer != parity.ProducerMCP {
+		t.Fatalf("the newest pin %s: producer %q, %v", name, b.Producer, err)
 	}
 }

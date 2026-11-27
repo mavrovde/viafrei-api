@@ -60,6 +60,10 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 			contributed = append(contributed, p.Family)
 		}
 	}
+	// A Land chosen by its area is read from the area as well.
+	if v.StateArea != "" {
+		contributed = append(contributed, v.StateArea)
+	}
 	// The judgement that the position may lie abroad is read from the
 	// addresses: their family is credited, as the platform credits it.
 	if v.MayLieAbroad && v.AbroadFamily != "" {

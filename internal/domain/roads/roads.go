@@ -669,6 +669,10 @@ type CorridorQuery struct {
 	// road rather than refusing it: a watch takes any valid road number, as
 	// the platform's watch does, and reports what names the road.
 	AnyMotorway bool
+	// SituationsOnly reads the situations and their scope alone, without
+	// the platform's motorway answer and road status: a watch reports the
+	// situations only and states neither, so it does not read them.
+	SituationsOnly bool
 	// Direction keeps the situations on this carriageway, on both, and
 	// those whose direction is unknown; DirectionBoth keeps every one.
 	Direction Direction

@@ -128,6 +128,32 @@ const (
 	AbroadEmptyRun = 4
 )
 
+// landAreas are the Land keys of the names Germany's Land areas are held
+// under (the OpenStreetMap extracts' names of the Länder).
+var landAreas = map[string]string{
+	"schleswig-holstein": "01", "hamburg": "02", "niedersachsen": "03", "bremen": "04",
+	"nordrhein-westfalen": "05", "hessen": "06", "rheinland-pfalz": "07", "baden-wuerttemberg": "08",
+	"bayern": "09", "saarland": "10", "berlin": "11", "brandenburg": "12",
+	"mecklenburg-vorpommern": "13", "sachsen": "14", "sachsen-anhalt": "15", "thueringen": "16",
+}
+
+// LandOfArea is the Land key of the Land area held under name; false for a
+// name that is no Land's.
+func LandOfArea(name string) (string, bool) {
+	key, ok := landAreas[name]
+	return key, ok
+}
+
+// LandArea is the Land area nearest a position: the name it is held under,
+// its family, whether it covers the position, and the stated distance to it
+// (0 inside).
+type LandArea struct {
+	Name      string
+	Family    string
+	Covers    bool
+	DistanceM int
+}
+
 // SectorWedges returns n wedges of radiusM around at, clockwise from north,
 // as WKT polygons: the platform's sectors, each arc of six steps on a flat
 // projection of the position's latitude.
@@ -176,11 +202,17 @@ type Location struct {
 	Address      *Address
 	Municipality *Place
 	District     *Place
-	// State is the Land of the district; with no district, the nearest Land.
+	// State is the Land of the district; with no district, the Land whose
+	// area is nearest (its distance that of the area), or, with no Land
+	// area held, the nearest Land's point.
 	State *Place
-	// MayLieAbroad is the platform's judgement that the position may lie
-	// outside Germany (AbroadSectors); AbroadFamily is then the family of
-	// the nearest address, the table it is read from.
+	// StateArea is the family of the Land area State was chosen by; empty
+	// when it was not.
+	StateArea string
+	// MayLieAbroad is the judgement that the position may lie outside
+	// Germany: no Land area covers it, or, with no Land area held, the
+	// platform's address scan (AbroadSectors). AbroadFamily is then the
+	// family of the areas, or of the nearest address.
 	MayLieAbroad bool
 	AbroadFamily string
 	// Gemeinde is the Gemeinde the position lies in; nil when the position

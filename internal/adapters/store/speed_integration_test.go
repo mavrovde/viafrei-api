@@ -4,10 +4,12 @@ package store_test
 
 import (
 	"context"
+	"regexp"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
@@ -158,5 +160,79 @@ func TestTheOfficialCellsAreKeptUnderTheirFamiliesVersions(t *testing.T) {
 	revoke(t, cp, "speed_enforcement")
 	if _, err := st.SpeedCameras(bounded(t), q, fams); err == nil {
 		t.Fatal("a cameras read whose official cells cannot be read succeeded")
+	}
+}
+
+// Hamburg's traffic cameras are traffic-view webcams, no enforcement point
+// (#301): a webcam planted beside OpenStreetMap's middle camera is neither
+// listed as an official camera nor cuts that camera, under a key that holds
+// the webcams' family.
+func TestTrafficWebcamsAreNoSpeedCameras(t *testing.T) {
+	st, _ := private(t, append(slices.Clone(speedCutRows),
+		`insert into vf_seed.speed_camera (camera_id, location, name, location_text, source_ref, recorded_at)
+		 values ('hh:990021', st_setsrid(st_makepoint(-19.655, 75.0), 4326), 'A1 AK Testkreuz', 'Jede Kamera kann mehrere Blickrichtungen einnehmen.',
+		         'hh_verkehrskameras', '2026-03-28T00:00:00Z')`)...)
+	fams := append(families(t, st, "roads"), "hh_verkehrskameras")
+	q := roads.SpeedQuery{At: geo.Point{Lat: 75.0, Lon: -19.65}, RadiusM: 30000, Today: time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC), Limit: 10}
+	got, err := st.SpeedCameras(bounded(t), q, fams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range got.Official {
+		if c.Family == "hh_verkehrskameras" {
+			t.Errorf("a webcam listed as an official camera: %+v", c)
+		}
+	}
+	if got.OfficialTotal != 2 || got.OSMTotal != 2 || !slices.ContainsFunc(got.OSM, func(c roads.SpeedCamera) bool { return c.ID == "osm:node990012" }) {
+		t.Errorf("official %d, OSM %+v (total %d)", got.OfficialTotal, got.OSM, got.OSMTotal)
+	}
+}
+
+// The official read orders by the kinds the enforcement table admits, and
+// by no other (#301: a webcam's 'fixed' came from no such row): the kinds
+// its statement names equal, in its order, the set the table's check
+// (speed_enforcement_kind, read from the schema, not the rows) admits.
+func TestTheOfficialKindsAreTheEnforcementTablesKinds(t *testing.T) {
+	var check string
+	if !fixtureRow(t, `select pg_get_constraintdef(c.oid) from pg_constraint c
+		where c.conrelid = 'public.speed_enforcement'::regclass and c.conname = 'speed_enforcement_kind'`, &check) {
+		t.Fatal("the enforcement table has no check of its kinds")
+	}
+	quoted := regexp.MustCompile(`'([a-z_]+)'`)
+	var admitted []string
+	for _, m := range quoted.FindAllStringSubmatch(check, -1) {
+		admitted = append(admitted, m[1])
+	}
+	var named []string
+	for _, r := range store.NamedReads() {
+		if r.Name != "api_speed_official" {
+			continue
+		}
+		order := regexp.MustCompile(`array_position\(array\[([^\]]*)\], c\.kind\)`).FindStringSubmatch(r.SQL)
+		if order == nil {
+			t.Fatalf("the official read orders by no kind list: %s", r.SQL)
+		}
+		for _, m := range quoted.FindAllStringSubmatch(order[1], -1) {
+			named = append(named, m[1])
+		}
+	}
+	want := []string{"fixed", "section_control", "mobile_announced", "measuring_site"}
+	if !slices.Equal(admitted, want) || !slices.Equal(named, admitted) {
+		t.Errorf("the check admits %v, the read names %v", admitted, named)
+	}
+}
+
+// A place with only a webcam in reach holds no speed camera: both lists
+// are empty, the counts 0 (the answer's notice, carried listed or not, is
+// the handler's: TestSpeedCamerasNoneHeld).
+func TestAPlaceWithOnlyAWebcamHoldsNoCamera(t *testing.T) {
+	st, _ := private(t, `insert into vf_seed.speed_camera (camera_id, location, name, location_text, source_ref, recorded_at)
+		 values ('hh:990031', st_setsrid(st_makepoint(-10.0, 75.0), 4326), 'A7 AS Testdorf', 'Jede Kamera kann mehrere Blickrichtungen einnehmen.',
+		         'hh_verkehrskameras', '2026-03-28T00:00:00Z')`)
+	fams := append(families(t, st, "roads"), "hh_verkehrskameras")
+	q := roads.SpeedQuery{At: geo.Point{Lat: 75.0, Lon: -10.0}, RadiusM: 5000, Today: time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC), Limit: 10}
+	got, err := st.SpeedCameras(bounded(t), q, fams)
+	if err != nil || len(got.Official) != 0 || got.OfficialTotal != 0 || len(got.OSM) != 0 || got.OSMTotal != 0 {
+		t.Errorf("%+v %v", got, err)
 	}
 }

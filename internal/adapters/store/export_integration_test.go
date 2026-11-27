@@ -204,6 +204,7 @@ var noPlatformRead = map[string]string{
 	"api_charging_feed_register": "the platform holds the charging feed register as code, not as a table it reads",
 	"api_stop_stations":          "the platform's route lists a station page's stops from the page, not the station pages around a stop; its rows are asserted on their own (TestStopStationIsTheStationThatListsIt)",
 	"api_state_events_english":   "the platform names a Land's events in German only; the English names are the API's own (lang=en)",
+	"api_location_land_area":     "the platform judges the Land and abroad from gazetteer points and an address scan; the Land areas' read is the API's own (#299), its rows asserted on their own (TestTheLandAndAbroadAreReadFromTheLandAreas)",
 }
 
 // NoPlatformRead is why a named statement has no platform statement to

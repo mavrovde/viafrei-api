@@ -10,7 +10,7 @@ fixture rows, offline: no live MCP server, no network.
 |---|---|
 | Questions: what both sides are asked, and the fixture rows they are asked on | `test/parity/questions.json` |
 | Bundle: the questions and the facts the capability answered | `test/parity/bundles/<platform>.json` |
-| Lock file: one bundle per platform version, with its SHA-256 | `test/parity/lock.tsv` |
+| Lock file: one bundle per MCP platform version it was answered at, with its SHA-256 | `test/parity/lock.tsv` |
 | Projection rules, loader, inventory and comparator | `internal/testkit/parity` |
 | Harness: seeds a throwaway PostGIS, asks the real handler, compares | `internal/testkit/parity/parity_integration_test.go` |
 
@@ -102,7 +102,7 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `meta.freshness` | API-only: the per-family freshness block of the read contract (ENV-003). |
 | `meta.warnings` | API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got (for example `partial` when a commercial key withholds a family). |
 | `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |
-| `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
+| `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its live families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
 | `data.station.location`, in `listStationDepartures` only | The MCP departure board states the stop's name and code, not its position. The site reads the station's position from the digest route `/internal/station/:slug`, so the API answers it; it is not compared. |
 | `data[*].location`, `data[*].districtCode`, `data[*].modes`, in `listStations` only | The MCP stop search states a stop's name, code and distance, not its position, district or modes. The site reads all three from the digest route `/internal/station/:slug` (the page's map and Land line from the stop's position and AGS, the live board's mode filter), so the API answers them; they are not compared. A position in any other operation, a charging site's or a car park's, is compared. |
 | `data[*].eva`, `data[*].evaNumbers`, in `listStations` only | The MCP stop search states a stop's name and codes, not its EVA numbers. The site reads them from the digest route `/internal/station/:slug` (the station page's DB board and its parts), so the API answers them; they are not compared. |
@@ -368,7 +368,7 @@ compared only by a checkout of its own time.
 
 - A fact missing, extra or changed: the harness prints each one by name, for
   example `changed data[cs-05-0012].location.lat: want "50.82957", got "50.8296"`.
-- No bundle pinned for the platform version in `internal/buildinfo/platform-version.txt`.
+- No `X.Y.Z` version pinned in the lock file.
 - A bundle whose bytes do not match the lock file's SHA-256, checked before
   it is parsed.
 - An empty bundle, an unknown member, another format, platform or rule set,
@@ -395,9 +395,13 @@ produced the bundle it compared.
 
 ## Two bundles, two jobs
 
-- **Parity evidence** is the bundle pinned for the platform version in
-  `internal/buildinfo/platform-version.txt`, produced by the MCP side
-  (`"producer": "mcp"`). `TestParity` compares it.
+- **Parity evidence** is the bundle pinned under the lock file's newest
+  `X.Y.Z` version, ordered by number (`parity.Newest`), produced by the MCP
+  side (`"producer": "mcp"`). `TestParity` compares it. The key is the MCP
+  platform version the bundle was answered at, which no later pin changes;
+  the choice reads no build fact of the API, whose own version is the one
+  `/v1/meta` states as `platformVersion` (docs/RELEASING.md). Pinning a newer
+  MCP bundle makes it the one compared.
 - **The regression lock** is `bundles/unsynced.json`, the API's own recording
   (`"producer": "api"`). `TestRegressionLock` compares it on every run. The
   API agrees with it by construction, so it is no evidence of parity.

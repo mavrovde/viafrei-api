@@ -11,8 +11,10 @@ const legacySpeedColumns = `c.camera_id, c.camera_kind, c.enforces, c.street, c.
        st_y(c.location), st_x(c.location), c.source_ref, count(*) over ()
 from contract.speed_camera c`
 
+// legacySpeedOfficial leaves out Hamburg's traffic webcams (hh:), which the
+// view listed as fixed cameras though they enforce nothing (#301).
 var legacySpeedOfficial = `select ` + legacySpeedColumns + `
-where c.camera_id not like 'osm:%' and ` + legacySpeedNear + `
+where c.camera_id not like 'osm:%' and c.camera_id not like 'hh:%' and ` + legacySpeedNear + `
   and (c.camera_kind <> 'mobile_announced' or coalesce(c.valid_to, c.valid_from) >= $4::date)
   and c.source_ref = any($5::text[]) and ` + permitted("c") + `
 order by array_position(array['fixed', 'section_control', 'mobile_announced', 'measuring_site'], c.camera_kind),

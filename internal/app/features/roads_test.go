@@ -797,6 +797,14 @@ func TestMotorwayConditionsCarryTheRoadStatus(t *testing.T) {
 		t.Errorf("failed read: %v", err)
 	}
 	f.roadStatusErr, f.gotRoadStatus = nil, nil
+	// A watch reads the situations alone: no road status, no motorway
+	// answer, though the key may read both (#300).
+	f.motorway, f.gotMotorway = roads.MotorwayRead{Tick: now}, nil
+	if c, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8", Limit: 3, SituationsOnly: true}); err != nil || c.RoadStatus != nil || f.gotRoadStatus != nil || c.Motorway != nil || f.gotMotorway != nil || len(c.Items) != 1 || !slices.Equal(names(c.Families), []string{"r1"}) {
+		t.Errorf("situations only: %+v, asked %+v %+v, %v", c, f.gotRoadStatus, f.gotMotorway, err)
+	}
+	f.motorway = roads.MotorwayRead{}
+	f.roadStatusErr, f.gotRoadStatus = nil, nil
 	if c, err = s.MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8"}); err != nil || c.RoadStatus != nil || f.gotRoadStatus != nil {
 		t.Errorf("none readable: %+v %v", c.RoadStatus, err)
 	}

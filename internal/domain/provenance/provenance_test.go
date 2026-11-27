@@ -136,6 +136,33 @@ func TestAsOfIsTheOldest(t *testing.T) {
 	}
 }
 
+// A register's load date never stands for an answer carrying live data
+// (#297): the oldest of the live families counts, a family read at least
+// hourly (threshold up to LiveWithinS, the bound included); without a live
+// family, the oldest of all; a live family with no instant is unknown.
+func TestAsOfIsTheOldestLiveFamily(t *testing.T) {
+	req.Covers(t, "ENV-004")
+	s := func(d time.Duration) *int64 { v := int64(d / time.Second); return &v }
+	live, bound, daily := s(15*time.Minute), s(provenance.LiveWithinS*time.Second), s((provenance.LiveWithinS+1)*time.Second)
+	fresh, older, load, timetable := at(10*time.Second), at(time.Hour), at(30*time.Hour), at(12*time.Hour)
+	fs := []provenance.Freshness{{DataAsOf: fresh, StaleAfterS: live}, {DataAsOf: load, StaleAfterS: daily}, {DataAsOf: older, StaleAfterS: bound}, {DataAsOf: timetable}}
+	if got := provenance.AsOf(fs); got != older {
+		t.Errorf("AsOf = %v, want the oldest live %v", got, older)
+	}
+	if got := provenance.AsOf(fs[1:2]); got != load {
+		t.Errorf("AsOf of a register alone = %v, want its %v", got, load)
+	}
+	if got := provenance.AsOf([]provenance.Freshness{{DataAsOf: load, StaleAfterS: daily}, {DataAsOf: timetable}}); got != load {
+		t.Errorf("AsOf of registers = %v, want the oldest %v", got, load)
+	}
+	if got := provenance.AsOf([]provenance.Freshness{{DataAsOf: load, StaleAfterS: daily}, {StaleAfterS: live}}); got != nil {
+		t.Errorf("AsOf with a live family never read = %v, want nil", got)
+	}
+	if (provenance.Freshness{}).Live() || !(provenance.Freshness{StaleAfterS: bound}).Live() || (provenance.Freshness{StaleAfterS: daily}).Live() {
+		t.Error("Live misjudges the bound")
+	}
+}
+
 func TestNotesAreDistinctAndOrdered(t *testing.T) {
 	req.Covers(t, "ENV-003")
 	fams := []provenance.Family{

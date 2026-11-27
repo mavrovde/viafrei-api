@@ -257,7 +257,7 @@ var Default = Rules{
 		{"data[*].sourceUrl", "", "listSources", sourceURLReason},
 		{"meta.warnings", "", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
 		{"meta.page.hasMore", "min_kw", "", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
-		{"meta.asOf", "", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
+		{"meta.asOf", "", "", "each side defines it differently: the API the oldest live family dataAsOf (ENV-004), MCP the newest current status or its clock"},
 		{"data.station.location", "", "listStationDepartures", siteReason("/internal/station/:slug")},
 		{"data[*].location", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data[*].districtCode", "", "listStations", siteReason("/internal/station/:slug")},

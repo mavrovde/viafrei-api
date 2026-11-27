@@ -314,7 +314,7 @@ type DataWarning struct {
 // DataMeta is the meta member of every data answer (ENV-001 to ENV-006).
 type DataMeta struct {
 	ResponseMeta
-	AsOf        *time.Time       `json:"asOf" nullable:"true" doc:"The oldest dataAsOf of meta.freshness; null when one is unknown."`
+	AsOf        *time.Time       `json:"asOf" nullable:"true" doc:"The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown."`
 	Freshness   []FreshnessEntry `json:"freshness" doc:"One entry per contributing source family."`
 	Attribution []Attribution    `json:"attribution" doc:"One entry per contributing source family; clients displaying the data must show its text."`
 	Notes       Notes            `json:"notes"`

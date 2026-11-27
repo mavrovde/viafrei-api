@@ -779,7 +779,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -1349,7 +1349,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -1593,7 +1593,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -2403,7 +2403,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -4805,7 +4805,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -4897,7 +4897,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -5591,7 +5591,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -5938,7 +5938,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -6532,7 +6532,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -7141,7 +7141,7 @@
             ]
           },
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -7639,7 +7639,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -8078,7 +8078,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -8695,7 +8695,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -10469,7 +10469,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -10918,7 +10918,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -11885,7 +11885,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of the live families of meta.freshness: those with a staleAfterS of at most 10800 (a source read at least hourly); of every family when none is live. A register (a daily or rarer load, the timetable, OpenStreetMap) states its instant in its own freshness entry only. Null when one of those is unknown.",
             "format": "date-time",
             "type": [
               "string",

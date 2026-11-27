@@ -90,7 +90,7 @@ func FuzzForwarded(f *testing.F) {
 	f.Add("198.51.100.1:5000", "192.0.2.7")
 	f.Add("10.0.0.1", ",,,")
 	f.Fuzz(func(t *testing.T, remote, forwarded string) {
-		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/no/such/path", nil)
 		r.RemoteAddr = remote
 		r.Header["X-Forwarded-For"] = []string{forwarded}
 		w := httptest.NewRecorder()

@@ -70,14 +70,25 @@ func principalFrom(ctx context.Context) auth.Principal {
 // presented returns the key of the request: the bearer token, else the
 // X-API-Key header.
 func presented(ctx huma.Context) string {
-	if h := ctx.Header("Authorization"); h != "" {
-		scheme, token, _ := strings.Cut(h, " ")
+	return presentedKey(ctx.Header("Authorization"), ctx.Header(APIKeyHeader))
+}
+
+// presentedIn is presented, from a request's header.
+func presentedIn(h http.Header) string {
+	return presentedKey(h.Get("Authorization"), h.Get(APIKeyHeader))
+}
+
+// presentedKey is the bearer token of authorization, else the X-API-Key
+// value apiKey; nothing for another scheme.
+func presentedKey(authorization, apiKey string) string {
+	if authorization != "" {
+		scheme, token, _ := strings.Cut(authorization, " ")
 		if strings.EqualFold(scheme, "Bearer") {
 			return strings.TrimSpace(token)
 		}
 		return ""
 	}
-	return strings.TrimSpace(ctx.Header(APIKeyHeader))
+	return strings.TrimSpace(apiKey)
 }
 
 // clientAddress is the request's client address as withClient found it,

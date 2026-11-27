@@ -47,6 +47,10 @@ func strictQuery(api huma.API) func(huma.Context, func(huma.Context)) {
 				errs = append(errs, &huma.ErrorDetail{Location: "query." + n, Message: "unknown parameter"})
 			case len(q[n]) > 1:
 				errs = append(errs, &huma.ErrorDetail{Location: "query." + n, Message: "repeated parameter"})
+			case q[n][0] == "":
+				// An empty value is no value: refused, as an empty at= is,
+				// never read as the default (#153).
+				errs = append(errs, &huma.ErrorDetail{Location: "query." + n, Message: "empty value"})
 			case numeric[n] && !finite(q[n][0]):
 				errs = append(errs, &huma.ErrorDetail{Location: "query." + n, Message: "expected a finite number", Value: q[n][0]})
 			}

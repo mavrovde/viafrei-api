@@ -24,15 +24,22 @@ An IPv6 address is counted by its prefix, `ratelimit.ipv6_prefix` (default
 64): one subscriber is routinely given a whole /64, so every address inside
 it shares one bucket and one table entry.
 
-The gate is decided per operation. It charges every request to the public
-service endpoint (`/v1/meta`), to an unknown path and to a
-switched-off operation, whatever headers it carries, and every request to a
-keyed operation that presents neither `Authorization` nor `X-API-Key`
-(SEC-051). A header sent where no key is checked is checked by nothing, so
-it buys no exemption.
-The health listener (`/healthz`, `/readyz` and `/v1/meta` on
-`health.listen_addr`) is outside the gate: the edge never routes it, and a
-probe of the platform is never refused.
+The gate is decided per operation. The service operations (`/healthz`,
+`/readyz`, `/v1/meta` and `/v1/pressure`, on the public listener and on
+the health listener) are outside it: an uptime monitor, a load balancer or
+a deploy script asking them from one address is never refused, and their
+documents name no 429. Readiness still reads storage through the
+admission gate, so it is bounded by the storage permits, not by address.
+The gate charges every request to a keyed operation that presents neither
+`Authorization` nor `X-API-Key` (SEC-051). A request that presents a key
+where no key is checked (an unknown path, a method its path does not
+serve, a switched-off operation) has its key checked once: a valid key's
+request takes a token of the key's own bucket and counts against its
+quotas, as a request to a keyed operation does, and carries its RateLimit
+fields; a key that is not valid buys no exemption, and the address is
+charged. So a 404 or a 405 answered to a valid key counts against that
+key, never against the address, and a refusal of it names the key's
+budget, never "without a key".
 
 RATE-001 reads "every request". A key presented to a keyed operation is not
 charged here: it is held by its own key's bucket (gate 2), and a request

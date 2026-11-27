@@ -36,7 +36,8 @@ func (shedding) Register(context.Context) ([]access.Terms, error) {
 
 func (shedding) Sources(context.Context, []string) ([]access.Source, error) { return nil, nil }
 
-// anonymousCodes sends six keyless requests from one peer through the
+// anonymousCodes sends six keyless requests to an unknown path (the service
+// operations are never charged) from one peer through the
 // per-address gate built from c, each naming another forwarded address,
 // and returns their status codes.
 func anonymousCodes(t *testing.T, c *config.Config) string {
@@ -47,7 +48,7 @@ func anonymousCodes(t *testing.T, c *config.Config) string {
 	}
 	var codes []string
 	for i := range 6 {
-		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/no/such/path", nil)
 		r.RemoteAddr = "127.0.0.1:4000"
 		r.Header.Set("X-Forwarded-For", fmt.Sprintf("192.0.2.%d", i+1))
 		w := httptest.NewRecorder()
@@ -68,7 +69,7 @@ func sixAddressesOfOneSubnet(t *testing.T, c *config.Config) string {
 	}
 	var codes []string
 	for i := range 6 {
-		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/no/such/path", nil)
 		r.RemoteAddr = fmt.Sprintf("[2001:db8:0:1::%x]:4000", i+1)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)

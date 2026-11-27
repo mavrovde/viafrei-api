@@ -241,7 +241,7 @@ type Compose struct {
 // RateLimit holds the per-address flood control and the rate-limit headers
 // (Spec: Rate Limiting, Quotas and Priority, gates 1 and 2).
 type RateLimit struct {
-	AnonRPS     int           `koanf:"anon_rps" default:"1" validate:"min=0,max=100" desc:"Requests per second one client address may make without presenting a key (service endpoints and keyless requests), as a token bucket (RATE-001, SEC-051). 0 switches the per-address limit off."`
+	AnonRPS     int           `koanf:"anon_rps" default:"1" validate:"min=0,max=100" desc:"Requests per second one client address may make without presenting a valid key, as a token bucket; the service operations are never charged (RATE-001, SEC-051). 0 switches the per-address limit off."`
 	AnonBurst   int           `koanf:"anon_burst" default:"5" validate:"min=1,max=1000" desc:"Burst of the per-address token bucket: requests a client address may make at once before ratelimit.anon_rps applies."`
 	Headers     bool          `koanf:"headers" default:"true" desc:"Send RateLimit-Policy and RateLimit on every keyed answer (RATE-006)."`
 	IPStateTTL  time.Duration `koanf:"ip_state_ttl" default:"10m" validate:"min=1m,max=60m" desc:"How long the state of an idle client address is kept; it is held in memory only and never stored (RATE-015)."`
